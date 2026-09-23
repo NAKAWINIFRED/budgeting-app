@@ -27,6 +27,10 @@ class Money {
     return formatter.format(fromMinor(minor, currency));
   }
 
+  /// The currency's symbol, e.g. "\$" for USD.
+  static String symbol(String currency) =>
+      NumberFormat.simpleCurrency(name: currency).currencySymbol;
+
   /// Share of an amount by basis points (5000 = 50%), rounded down so
   /// buckets never add up to more than the money that actually came in.
   static int share(int minor, int basisPoints) => minor * basisPoints ~/ 10000;

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +11,6 @@ import '../../data/database_provider.dart';
 import '../../dev/sample_data.dart';
 import 'dashboard_providers.dart';
 import 'tide_gauge.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});

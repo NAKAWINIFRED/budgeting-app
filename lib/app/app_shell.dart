@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/transactions/quick_add_sheet.dart';
+
 /// The frame around the four main tabs: bottom navigation + the add button.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
@@ -13,12 +15,7 @@ class AppShell extends StatelessWidget {
       body: navigationShell,
       floatingActionButton: FloatingActionButton(
         tooltip: 'Add transaction',
-        onPressed: () {
-          // Replaced by the quick-add sheet in the next step.
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Quick add is coming next.')),
-          );
-        },
+        onPressed: () => showQuickAddSheet(context),
         child: const Icon(Icons.add_rounded, size: 28),
       ),
       bottomNavigationBar: NavigationBar(
