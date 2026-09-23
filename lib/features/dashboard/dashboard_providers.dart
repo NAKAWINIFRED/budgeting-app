@@ -68,11 +68,19 @@ class DashboardSummary {
 }
 
 class ActivityItem {
-  ActivityItem({required this.tx, required this.title, required this.iconKey});
+  ActivityItem({
+    required this.tx,
+    required this.title,
+    required this.iconKey,
+    this.itemNames = const [],
+  });
 
   final MoneyTransaction tx;
   final String title;
   final String iconKey;
+
+  /// Names of this expense's items, e.g. ["Eggs", "Soap"]. Empty if none.
+  final List<String> itemNames;
 
   bool get isIncoming =>
       tx.kind == TransactionKind.income ||
@@ -143,7 +151,32 @@ Future<List<ActivityItem>> describeTransactions(
   };
   final debts = {for (final d in await db.select(db.debts).get()) d.id: d};
 
-  return [for (final tx in txs) _describe(tx, categories, goals, debts)];
+  final ids = [for (final tx in txs) tx.id];
+  final items = ids.isEmpty
+      ? <TransactionItem>[]
+      : await (db.select(db.transactionItems)
+            ..where((i) => i.transactionId.isIn(ids))
+            ..orderBy([(i) => OrderingTerm.asc(i.sortOrder)]))
+          .get();
+  final namesByTx = <String, List<String>>{};
+  for (final item in items) {
+    namesByTx.putIfAbsent(item.transactionId, () => []).add(item.name);
+  }
+
+  return [
+    for (final tx in txs)
+      _withItems(_describe(tx, categories, goals, debts), namesByTx[tx.id]),
+  ];
+}
+
+ActivityItem _withItems(ActivityItem a, List<String>? names) {
+  if (names == null) return a;
+  return ActivityItem(
+    tx: a.tx,
+    title: a.title,
+    iconKey: a.iconKey,
+    itemNames: names,
+  );
 }
 
 // ============================================================================

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 const Map<String, IconData> _icons = {
   'home': Icons.home_rounded,
   'shopping_cart': Icons.shopping_cart_rounded,
+  'cleaning_services': Icons.cleaning_services_rounded,
   'directions_bus': Icons.directions_bus_rounded,
   'bolt': Icons.bolt_rounded,
   'phone_android': Icons.phone_android_rounded,
@@ -21,6 +22,14 @@ const Map<String, IconData> _icons = {
   'handyman': Icons.handyman_rounded,
   'redeem': Icons.redeem_rounded,
   'savings': Icons.savings_rounded,
+  'shield': Icons.shield_rounded,
+  'directions_car': Icons.directions_car_rounded,
+  'flight': Icons.flight_rounded,
+  'phone_iphone': Icons.phone_iphone_rounded,
+  'celebration': Icons.celebration_rounded,
+  'beach_access': Icons.beach_access_rounded,
+  'favorite': Icons.favorite_rounded,
+  'trending_up': Icons.trending_up_rounded,
   'payments': Icons.payments_rounded,
 };
 

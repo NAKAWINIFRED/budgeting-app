@@ -21,6 +21,8 @@ Future<void> insertSampleData(AppDatabase db) async {
   final emergencyFundId = uuid.v4();
   final retirementId = uuid.v4();
   final carLoanId = uuid.v4();
+  final billsId = uuid.v4();
+  final groceriesId = uuid.v4();
 
   TransactionsCompanion tx(
     TransactionKind kind,
@@ -71,15 +73,43 @@ Future<void> insertSampleData(AppDatabase db) async {
       ),
     );
 
+    // Two itemized expenses, to show the breakdown feature.
+    b.insert(
+      db.transactions,
+      tx(TransactionKind.expense, 60, day(6), categoryId: cat('Bills & Utilities'))
+          .copyWith(id: Value(billsId)),
+    );
+    b.insert(
+      db.transactions,
+      tx(TransactionKind.expense, 140, day(3), categoryId: cat('Groceries'))
+          .copyWith(id: Value(groceriesId)),
+    );
+    b.insertAll(db.transactionItems, [
+      for (final (i, item) in [
+        (billsId, 'Electricity', 20),
+        (billsId, 'Water', 10),
+        (billsId, 'Wifi', 30),
+        (groceriesId, 'Eggs', 12),
+        (groceriesId, 'Rice', 45),
+        (groceriesId, 'Vegetables', 38),
+        (groceriesId, 'Cooking oil', 25),
+        (groceriesId, 'Soap', 20),
+      ].indexed)
+        TransactionItemsCompanion.insert(
+          transactionId: item.$1,
+          name: item.$2,
+          amountMinor: Money.toMinor(item.$3, currency),
+          sortOrder: Value(i),
+        ),
+    ]);
+
     b.insertAll(db.transactions, [
       tx(TransactionKind.income, 2400, day(1), categoryId: cat('Salary')),
       tx(TransactionKind.income, 350, day(5), categoryId: cat('Freelance & Gigs')),
       tx(TransactionKind.expense, 850, day(2), categoryId: cat('Housing & Rent')),
-      tx(TransactionKind.expense, 140, day(3), categoryId: cat('Groceries')),
-      tx(TransactionKind.expense, 85, day(9), categoryId: cat('Groceries')),
+            tx(TransactionKind.expense, 85, day(9), categoryId: cat('Groceries')),
       tx(TransactionKind.expense, 60, day(4), categoryId: cat('Transport')),
-      tx(TransactionKind.expense, 75, day(6), categoryId: cat('Utilities')),
-      tx(TransactionKind.expense, 25, day(6), categoryId: cat('Phone & Internet')),
+            tx(TransactionKind.expense, 25, day(6), categoryId: cat('Phone & Internet')),
       tx(TransactionKind.expense, 48, day(8), categoryId: cat('Dining Out')),
       tx(TransactionKind.expense, 30, day(10), categoryId: cat('Entertainment')),
       tx(TransactionKind.expense, 65, day(11), categoryId: cat('Shopping')),

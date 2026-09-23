@@ -15,6 +15,7 @@ part 'database.g.dart';
     Categories,
     IncomeSources,
     Transactions,
+    TransactionItems,
     BudgetStrategies,
     BudgetBuckets,
     Debts,
@@ -27,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   // Bump this every time a table changes, and add a step in onUpgrade.
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -40,6 +41,23 @@ class AppDatabase extends _$AppDatabase {
           // loses their data when the app updates.
           if (from < 2) {
             await m.addColumn(debts, debts.paidBeforeTrackingMinor);
+          }
+          if (from < 3) {
+            await m.createTable(transactionItems);
+            await (update(categories)..where((c) => c.name.equals('Utilities')))
+                .write(const CategoriesCompanion(name: Value('Bills & Utilities')));
+            await into(categories).insert(
+              CategoriesCompanion.insert(
+                name: 'Home Supplies',
+                kind: CategoryKind.expense,
+                iconKey: 'cleaning_services',
+                budgetTag: const Value(BudgetTag.essentials),
+                sortOrder: const Value(1),
+              ),
+            );
+          }
+          if (from < 4) {
+            await m.addColumn(savingsGoals, savingsGoals.startingAmountMinor);
           }
         },
         beforeOpen: (details) async {
@@ -58,8 +76,9 @@ class AppDatabase extends _$AppDatabase {
     const expenseCategories = <(String, String, BudgetTag)>[
       ('Housing & Rent', 'home', BudgetTag.essentials),
       ('Groceries', 'shopping_cart', BudgetTag.essentials),
+      ('Home Supplies', 'cleaning_services', BudgetTag.essentials),
       ('Transport', 'directions_bus', BudgetTag.essentials),
-      ('Utilities', 'bolt', BudgetTag.essentials),
+      ('Bills & Utilities', 'bolt', BudgetTag.essentials),
       ('Phone & Internet', 'phone_android', BudgetTag.essentials),
       ('Health', 'medical_services', BudgetTag.essentials),
       ('Education', 'school', BudgetTag.essentials),

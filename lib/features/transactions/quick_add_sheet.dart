@@ -14,6 +14,9 @@ import '../../data/transactions_repository.dart';
 import '../debts/add_debt_sheet.dart';
 import '../debts/debt_labels.dart';
 import '../debts/debt_providers.dart';
+import '../savings/goal_sheet.dart';
+import '../savings/savings_labels.dart';
+import '../savings/savings_providers.dart';
 
 /// Opens the quick-add sheet from anywhere in the app. Pass [existing] to
 /// edit or delete a transaction instead of adding a new one.
@@ -60,7 +63,7 @@ extension on TransactionKind {
         TransactionKind.income => 'Save income',
         TransactionKind.savingsDeposit => 'Add to savings',
         TransactionKind.debtPayment => 'Save payment',
-        TransactionKind.savingsWithdrawal => 'Save withdrawal',
+        TransactionKind.savingsWithdrawal => 'Take out of savings',
       };
 
   String get savedMessage => switch (this) {
@@ -68,7 +71,7 @@ extension on TransactionKind {
         TransactionKind.income => 'Income saved',
         TransactionKind.savingsDeposit => 'Added to savings',
         TransactionKind.debtPayment => 'Payment saved',
-        TransactionKind.savingsWithdrawal => 'Withdrawal saved',
+        TransactionKind.savingsWithdrawal => 'Taken out of savings',
       };
 }
 
@@ -94,7 +97,19 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   DateTime _date = DateUtils.dateOnly(DateTime.now());
   bool _saving = false;
 
+  /// Item rows when an expense is broken down (empty = not itemized).
+  final List<_ItemRow> _items = [];
+  List<TransactionItem> _originalItems = [];
+
   bool get _isEditing => widget.existing != null;
+  bool get _itemized => _items.isNotEmpty;
+
+  String _amountText(int minor) {
+    final value = Money.fromMinor(minor, _currency);
+    return value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toStringAsFixed(Money.fractionDigits(_currency));
+  }
 
   @override
   void initState() {
@@ -107,20 +122,50 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     _debtId = tx.debtId;
     _date = DateUtils.dateOnly(tx.occurredAt);
     _note.text = tx.note ?? '';
-    final value = Money.fromMinor(tx.amountMinor, _currency);
-    _amount.text = value == value.roundToDouble()
-        ? value.toInt().toString()
-        : value.toStringAsFixed(Money.fractionDigits(_currency));
+    _amount.text = _amountText(tx.amountMinor);
+
+    // Load this transaction's items, if it has any.
+    ref.read(transactionsRepositoryProvider).itemsFor(tx.id).then((items) {
+      if (!mounted || items.isEmpty) return;
+      setState(() {
+        _originalItems = items;
+        _items.addAll(
+          items.map((i) => _ItemRow(i.name, _amountText(i.amountMinor))),
+        );
+      });
+    });
   }
 
   @override
   void dispose() {
     _amount.dispose();
     _note.dispose();
+    for (final row in _items) {
+      row.dispose();
+    }
     super.dispose();
   }
 
-  int get _amountMinor => parseAmountMinor(_amount.text, _currency);
+  /// When itemized, the amount is always the sum of the items.
+  int get _amountMinor => _itemized
+      ? _itemDrafts().fold(0, (sum, i) => sum + i.amountMinor)
+      : parseAmountMinor(_amount.text, _currency);
+
+  List<ItemDraft> _itemDrafts() => [
+        for (final row in _items)
+          if (parseAmountMinor(row.amount.text, _currency) > 0)
+            ItemDraft(
+              row.name.text.trim().isEmpty ? 'Item' : row.name.text.trim(),
+              parseAmountMinor(row.amount.text, _currency),
+            ),
+      ];
+
+  void _addItemRow() => setState(() => _items.add(_ItemRow('', '')));
+
+  void _removeItemRow(_ItemRow row) {
+    setState(() => _items.remove(row));
+    row.dispose();
+  }
 
   bool get _canSave {
     if (_saving || _amountMinor <= 0) return false;
@@ -142,6 +187,12 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   void _selectKind(TransactionKind kind) {
     setState(() {
       _kind = kind;
+      if (kind != TransactionKind.expense) {
+        for (final row in _items) {
+          row.dispose();
+        }
+        _items.clear();
+      }
       _categoryId = null;
       _goalId = null;
       _debtId = null;
@@ -186,14 +237,18 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
             debtId: Value(_debtId),
             note: Value(note.isEmpty ? null : note),
           ),
+          items: _itemDrafts(),
         );
+        final previousItems = [
+          for (final i in _originalItems) ItemDraft(i.name, i.amountMinor),
+        ];
         navigator.pop();
         messenger.showSnackBar(
           SnackBar(
             content: const Text('Changes saved'),
             action: SnackBarAction(
               label: 'Undo',
-              onPressed: () => repo.update(old),
+              onPressed: () => repo.update(old, items: previousItems),
             ),
           ),
         );
@@ -205,6 +260,11 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
       }
       return;
     }
+
+    // Goal progress before this deposit, to spot milestones.
+    final goalBefore = kind == TransactionKind.savingsDeposit && _goalId != null
+        ? ref.read(savingsOverviewProvider).value?.byId(_goalId)
+        : null;
 
     // Debt progress before this payment, to spot milestones.
     final debtBefore = kind == TransactionKind.debtPayment && _debtId != null
@@ -224,9 +284,41 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
         savingsGoalId: _goalId,
         debtId: _debtId,
         note: note.isEmpty ? null : note,
+        items: _itemDrafts(),
       );
 
       navigator.pop();
+
+      // A savings goal just reached its target: celebrate.
+      if (goalBefore != null &&
+          goalBefore.hasTarget &&
+          !goalBefore.isReached &&
+          goalBefore.savedMinor + amount >= goalBefore.targetMinor!) {
+        final goalName = goalBefore.name;
+        final target = Money.format(goalBefore.targetMinor!, _currency);
+        await showDialog<void>(
+          context: navigator.context,
+          builder: (context) => AlertDialog(
+            icon: const Icon(
+              Icons.emoji_events_rounded,
+              size: 44,
+              color: AppColors.tide,
+            ),
+            title: Text('You reached $goalName!'),
+            content: Text(
+              'You saved $target, one deposit at a time. That is real '
+              'discipline. Set a new goal whenever you are ready.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Done'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
 
       if (debtBefore != null &&
           !debtBefore.isPaidOff &&
@@ -256,14 +348,21 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
         return;
       }
 
-      final milestone = debtBefore == null
-          ? null
-          : milestoneMessage(
+      final milestone = debtBefore != null
+          ? milestoneMessage(
               debtName: debtBefore.debt.name,
               totalMinor: debtBefore.totalMinor,
               paidBeforeMinor: debtBefore.paidMinor,
               paymentMinor: amount,
-            );
+            )
+          : goalBefore != null && goalBefore.hasTarget
+              ? savingsMilestoneMessage(
+                  goalName: goalBefore.name,
+                  targetMinor: goalBefore.targetMinor!,
+                  savedBeforeMinor: goalBefore.savedMinor,
+                  depositMinor: amount,
+                )
+              : null;
 
       messenger.showSnackBar(
         SnackBar(
@@ -278,6 +377,11 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
         SnackBar(content: Text('Could not save. Please try again. ($e)')),
       );
     }
+  }
+
+  Future<void> _addGoal() async {
+    final id = await showGoalSheet(context);
+    if (id != null && mounted) setState(() => _goalId = id);
   }
 
   Future<void> _addDebt() async {
@@ -311,12 +415,13 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
+    final items = await repo.itemsFor(tx.id);
     await repo.delete(tx.id);
     navigator.pop();
     messenger.showSnackBar(
       SnackBar(
         content: const Text('Transaction deleted'),
-        action: SnackBarAction(label: 'Undo', onPressed: () => repo.restore(tx)),
+        action: SnackBarAction(label: 'Undo', onPressed: () => repo.restore(tx, items)),
       ),
     );
   }
@@ -337,18 +442,37 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
           children: [
             SegmentedButton<TransactionKind>(
               segments: [
-                for (final k in [
-                  ..._kinds,
-                  if (widget.existing?.kind == TransactionKind.savingsWithdrawal)
-                    TransactionKind.savingsWithdrawal,
-                ])
+                for (final k in _kinds)
                   ButtonSegment(value: k, label: Text(k.tabLabel)),
               ],
-              selected: {_kind},
+              // Taking money out is part of the Savings tab.
+              selected: {
+                _kind == TransactionKind.savingsWithdrawal
+                    ? TransactionKind.savingsDeposit
+                    : _kind,
+              },
               showSelectedIcon: false,
               onSelectionChanged: (s) => _selectKind(s.first),
             ),
             const SizedBox(height: 16),
+            if (_itemized)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Total from items',
+                      style: text.bodySmall?.copyWith(color: AppColors.mist),
+                    ),
+                    Text(
+                      Money.format(_amountMinor, _currency),
+                      style: AppText.amount(40, weight: FontWeight.w800),
+                    ),
+                  ],
+                ),
+              )
+            else
             TextField(
               controller: _amount,
               autofocus: !_isEditing,
@@ -372,6 +496,27 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
             ),
             const SizedBox(height: 10),
             _buildPicker(),
+            if (_kind == TransactionKind.expense) ...[
+              const SizedBox(height: 16),
+              if (_itemized) ...[
+                Text(
+                  'Items',
+                  style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                for (final row in _items) _buildItemRow(row),
+              ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _addItemRow,
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  label: Text(
+                    _itemized ? 'Add another item' : 'Break it down into items',
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             Row(
               children: [
@@ -454,26 +599,58 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
           );
     }
 
-    if (_kind == TransactionKind.savingsDeposit) {
-      return ref.watch(activeGoalsProvider).when(
-            loading: () => const SizedBox(height: 40),
-            error: (e, _) => Text('Could not load goals. ($e)'),
-            data: (goals) => _chipWrap([
-              _choice(
-                label: 'General savings',
-                icon: Icons.savings_rounded,
-                selected: _goalId == null,
-                onTap: () => setState(() => _goalId = null),
+    if (_kind == TransactionKind.savingsDeposit ||
+        _kind == TransactionKind.savingsWithdrawal) {
+      // Keeps savings progress loaded so milestones can be spotted on save.
+      ref.watch(savingsOverviewProvider);
+      final addGoalChip = ActionChip(
+        avatar: const Icon(Icons.add_rounded, size: 18, color: AppColors.tide),
+        label: const Text('New goal'),
+        backgroundColor: Colors.white,
+        shape: const StadiumBorder(),
+        side: const BorderSide(color: AppColors.tide),
+        onPressed: _addGoal,
+      );
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: false, label: Text('Put in')),
+              ButtonSegment(value: true, label: Text('Take out')),
+            ],
+            selected: {_kind == TransactionKind.savingsWithdrawal},
+            showSelectedIcon: false,
+            onSelectionChanged: (s) => setState(
+              () => _kind = s.first
+                  ? TransactionKind.savingsWithdrawal
+                  : TransactionKind.savingsDeposit,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ref.watch(activeGoalsProvider).when(
+                loading: () => const SizedBox(height: 40),
+                error: (e, _) => Text('Could not load goals. ($e)'),
+                data: (goals) => _chipWrap([
+                  _choice(
+                    label: 'General savings',
+                    icon: Icons.savings_rounded,
+                    selected: _goalId == null,
+                    onTap: () => setState(() => _goalId = null),
+                  ),
+                  for (final g in goals)
+                    _choice(
+                      label: g.name,
+                      icon: iconFor(g.iconKey ?? 'savings'),
+                      selected: _goalId == g.id,
+                      onTap: () => setState(() => _goalId = g.id),
+                    ),
+                  if (_kind == TransactionKind.savingsDeposit) addGoalChip,
+                ]),
               ),
-              for (final g in goals)
-                _choice(
-                  label: g.name,
-                  icon: iconFor(g.iconKey ?? 'savings'),
-                  selected: _goalId == g.id,
-                  onTap: () => setState(() => _goalId = g.id),
-                ),
-            ]),
-          );
+        ],
+      );
     }
 
     // Debt payment. Watching the overview keeps it loaded, so milestones
@@ -516,6 +693,57 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
         );
   }
 
+  Widget _buildItemRow(_ItemRow row) {
+    InputDecoration deco(String hint, {String? prefix}) => InputDecoration(
+          hintText: hint,
+          prefixText: prefix,
+          isDense: true,
+          filled: true,
+          fillColor: AppColors.foam,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+        );
+
+    return Padding(
+      key: ObjectKey(row),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: TextField(
+              controller: row.name,
+              autofocus: !_isEditing,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.next,
+              decoration: deco('e.g. Eggs'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 2,
+            child: TextField(
+              controller: row.amount,
+              keyboardType: TextInputType.numberWithOptions(
+                decimal: Money.fractionDigits(_currency) > 0,
+              ),
+              inputFormatters: [amountInputFormatter(_currency)],
+              decoration: deco('0', prefix: '${Money.symbol(_currency)} '),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Remove item',
+            icon: const Icon(Icons.close_rounded, color: AppColors.mist),
+            onPressed: () => _removeItemRow(row),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _chipWrap(List<Widget> children) =>
       Wrap(spacing: 8, runSpacing: 8, children: children);
 
@@ -540,5 +768,20 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
       side: BorderSide(color: selected ? AppColors.tide : AppColors.line),
       onSelected: (_) => onTap(),
     );
+  }
+}
+
+/// Text fields for one item row in an itemized expense.
+class _ItemRow {
+  _ItemRow(String name, String amount)
+      : name = TextEditingController(text: name),
+        amount = TextEditingController(text: amount);
+
+  final TextEditingController name;
+  final TextEditingController amount;
+
+  void dispose() {
+    name.dispose();
+    amount.dispose();
   }
 }

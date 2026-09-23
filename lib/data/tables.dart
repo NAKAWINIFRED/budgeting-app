@@ -106,6 +106,23 @@ class Transactions extends Table with SyncColumns {
   Set<Column> get primaryKey => {id};
 }
 
+/// The pieces of one expense, e.g. a grocery trip split into Eggs, Soap,
+/// Milk, or a bills payment split into Electricity, Water, Wifi.
+/// When a transaction has items, its amount is the sum of its items.
+/// (Added in schema version 3.)
+@DataClassName('TransactionItem')
+class TransactionItems extends Table with SyncColumns {
+  TextColumn get transactionId => text()
+      .references(Transactions, #id, onDelete: KeyAction.cascade)();
+  TextColumn get name => text().withLength(min: 1, max: 60)();
+  IntColumn get amountMinor =>
+      integer().check(amountMinor.isBiggerThanValue(0))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DataClassName('BudgetStrategy')
 class BudgetStrategies extends Table with SyncColumns {
   TextColumn get name => text().withLength(min: 1, max: 40)();
@@ -157,12 +174,16 @@ class Debts extends Table with SyncColumns {
   Set<Column> get primaryKey => {id};
 }
 
-/// Contributions are Transactions with kind = savingsDeposit / Withdrawal.
+/// Saved = startingAmountMinor + deposits - withdrawals (Transactions with
+/// kind savingsDeposit / savingsWithdrawal and this goal's id).
 @DataClassName('SavingsGoal')
 class SavingsGoals extends Table with SyncColumns {
   TextColumn get name => text().withLength(min: 1, max: 60)();
   TextColumn get term => textEnum<SavingsTerm>()();
   IntColumn get targetAmountMinor => integer().nullable()();
+  // Money already saved before tracking in Tidewise. (Schema version 4.)
+  IntColumn get startingAmountMinor =>
+      integer().withDefault(const Constant(0))();
   TextColumn get currency => text().withLength(min: 3, max: 3)();
   DateTimeColumn get targetDate => dateTime().nullable()();
   TextColumn get iconKey => text().nullable()();

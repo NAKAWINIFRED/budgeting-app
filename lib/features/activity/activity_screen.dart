@@ -9,12 +9,20 @@ import '../dashboard/dashboard_providers.dart';
 import '../shared/activity_row.dart';
 import '../transactions/quick_add_sheet.dart';
 import 'activity_providers.dart';
+import 'breakdown_view.dart';
 
-class ActivityScreen extends ConsumerWidget {
+class ActivityScreen extends ConsumerStatefulWidget {
   const ActivityScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ActivityScreen> createState() => _ActivityScreenState();
+}
+
+class _ActivityScreenState extends ConsumerState<ActivityScreen> {
+  bool _showBreakdown = false;
+
+  @override
+  Widget build(BuildContext context) {
     final activity = ref.watch(monthActivityProvider);
     final filter = ref.watch(activityFilterProvider);
 
@@ -23,14 +31,33 @@ class ActivityScreen extends ConsumerWidget {
       body: Column(
         children: [
           const _MonthSwitcher(),
-          const _FilterBar(),
-          Expanded(
-            child: activity.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) =>
-                  Center(child: Text('Could not load activity.\n$e')),
-              data: (a) => _ActivityList(activity: a, filter: filter),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+            child: SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('List')),
+                  ButtonSegment(value: true, label: Text('Breakdown')),
+                ],
+                selected: {_showBreakdown},
+                showSelectedIcon: false,
+                onSelectionChanged: (s) =>
+                    setState(() => _showBreakdown = s.first),
+              ),
             ),
+          ),
+          if (!_showBreakdown) const _FilterBar(),
+          Expanded(
+            child: _showBreakdown
+                ? const BreakdownView()
+                : activity.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) =>
+                        Center(child: Text('Could not load activity.\n$e')),
+                    data: (a) => _ActivityList(activity: a, filter: filter),
+                  ),
           ),
         ],
       ),
@@ -190,10 +217,11 @@ class _ActivityList extends StatelessWidget {
     );
   }
 
-  /// The note if there is one, otherwise the time (the day is in the header).
+  /// The note, else the item names, else the time (the day is in the header).
   String _subtitle(ActivityItem item) {
     final note = item.tx.note;
     if (note != null && note.isNotEmpty) return note;
+    if (item.itemNames.isNotEmpty) return item.itemNames.join(', ');
     return DateFormat.jm().format(item.tx.occurredAt);
   }
 }
