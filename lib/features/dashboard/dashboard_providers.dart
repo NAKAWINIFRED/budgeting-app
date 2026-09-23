@@ -5,6 +5,7 @@ import '../../core/app_config.dart';
 import '../../core/money.dart';
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
+import '../../data/watch_tables.dart';
 
 // ============================================================================
 // MODELS
@@ -23,6 +24,9 @@ class BucketProgress {
 
   double get ratio => allocatedMinor <= 0 ? 0 : usedMinor / allocatedMinor;
 
+  /// Positive = room left (or still to save); negative = over the plan.
+  int get remainingMinor => allocatedMinor - usedMinor;
+
   /// Savings and debt buckets are good to go over; spending buckets are not.
   bool get isGoodWhenOver => bucket.tagList.every(
         (t) =>
@@ -39,6 +43,8 @@ class DashboardSummary {
     required this.outflowMinor,
     required this.strategy,
     required this.buckets,
+    required this.categories,
+    required this.spentByCategory,
   });
 
   final String currency;
@@ -48,6 +54,10 @@ class DashboardSummary {
   final int outflowMinor;
   final BudgetStrategy? strategy;
   final List<BucketProgress> buckets;
+  final Map<String, CategoryItem> categories;
+
+  /// This month's spending per category id.
+  final Map<String, int> spentByCategory;
 
   int get safeToSpendMinor => incomeMinor - outflowMinor;
 
@@ -82,16 +92,29 @@ class ActivityItem {
 
 final dashboardSummaryProvider = StreamProvider<DashboardSummary>((ref) {
   final db = ref.watch(appDatabaseProvider);
-  final (start, end) = currentMonthRange();
 
-  final query = db.select(db.transactions)
-    ..where(
-      (t) =>
-          t.occurredAt.isBiggerOrEqualValue(start) &
-          t.occurredAt.isSmallerThanValue(end),
-    );
-
-  return query.watch().asyncMap((txs) => _buildSummary(db, txs));
+  // Recalculates when transactions change AND when the user switches plans.
+  return watchTables(
+    db,
+    [
+      db.transactions,
+      db.budgetStrategies,
+      db.budgetBuckets,
+      db.categories,
+      db.savingsGoals,
+    ],
+    () async {
+      final (start, end) = currentMonthRange();
+      final txs = await (db.select(db.transactions)
+            ..where(
+              (t) =>
+                  t.occurredAt.isBiggerOrEqualValue(start) &
+                  t.occurredAt.isSmallerThanValue(end),
+            ))
+          .get();
+      return _buildSummary(db, txs);
+    },
+  );
 });
 
 final recentActivityProvider = StreamProvider<List<ActivityItem>>((ref) {
@@ -153,6 +176,7 @@ Future<DashboardSummary> _buildSummary(
   var income = 0;
   var outflow = 0;
   final usedByTag = {for (final t in BudgetTag.values) t: 0};
+  final spentByCategory = <String, int>{};
 
   // NOTE: assumes one currency for now. Multi-currency comes later.
   for (final tx in txs) {
@@ -164,6 +188,11 @@ Future<DashboardSummary> _buildSummary(
         outflow += amount;
         final tag = categories[tx.categoryId]?.budgetTag ?? BudgetTag.wants;
         usedByTag[tag] = usedByTag[tag]! + amount;
+        final categoryId = tx.categoryId;
+        if (categoryId != null) {
+          spentByCategory[categoryId] =
+              (spentByCategory[categoryId] ?? 0) + amount;
+        }
       case TransactionKind.savingsDeposit:
         outflow += amount;
         final tag = _savingsTag(goals[tx.savingsGoalId]);
@@ -183,6 +212,8 @@ Future<DashboardSummary> _buildSummary(
     incomeMinor: income,
     outflowMinor: outflow,
     strategy: strategy,
+    categories: categories,
+    spentByCategory: spentByCategory,
     buckets: [
       for (final b in buckets)
         BucketProgress(
