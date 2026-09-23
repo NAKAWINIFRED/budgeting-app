@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/activity/activity_screen.dart';
 import '../features/categories/categories_screen.dart';
+import '../features/subscriptions/subscriptions_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/goals/goals_screen.dart';
 import '../features/plan/plan_screen.dart';
@@ -21,6 +22,10 @@ final appRouter = GoRouter(
             ? CategoryKind.income
             : CategoryKind.expense,
       ),
+    ),
+    GoRoute(
+      path: '/subscriptions',
+      builder: (context, state) => const SubscriptionsScreen(),
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>

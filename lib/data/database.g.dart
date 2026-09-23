@@ -85,6 +85,17 @@ class $CategoriesTable extends Categories
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       ).withConverter<BudgetTag?>($CategoriesTable.$converterbudgetTagn);
+  static const VerificationMeta _parentIdMeta = const VerificationMeta(
+    'parentId',
+  );
+  @override
+  late final GeneratedColumn<String> parentId = GeneratedColumn<String>(
+    'parent_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _sortOrderMeta = const VerificationMeta(
     'sortOrder',
   );
@@ -121,6 +132,7 @@ class $CategoriesTable extends Categories
     kind,
     iconKey,
     budgetTag,
+    parentId,
     sortOrder,
     isArchived,
   ];
@@ -166,6 +178,12 @@ class $CategoriesTable extends Categories
       );
     } else if (isInserting) {
       context.missing(_iconKeyMeta);
+    }
+    if (data.containsKey('parent_id')) {
+      context.handle(
+        _parentIdMeta,
+        parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta),
+      );
     }
     if (data.containsKey('sort_order')) {
       context.handle(
@@ -220,6 +238,10 @@ class $CategoriesTable extends Categories
           data['${effectivePrefix}budget_tag'],
         ),
       ),
+      parentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_id'],
+      ),
       sortOrder: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}sort_order'],
@@ -252,6 +274,7 @@ class CategoryItem extends DataClass implements Insertable<CategoryItem> {
   final CategoryKind kind;
   final String iconKey;
   final BudgetTag? budgetTag;
+  final String? parentId;
   final int sortOrder;
   final bool isArchived;
   const CategoryItem({
@@ -262,6 +285,7 @@ class CategoryItem extends DataClass implements Insertable<CategoryItem> {
     required this.kind,
     required this.iconKey,
     this.budgetTag,
+    this.parentId,
     required this.sortOrder,
     required this.isArchived,
   });
@@ -283,6 +307,9 @@ class CategoryItem extends DataClass implements Insertable<CategoryItem> {
         $CategoriesTable.$converterbudgetTagn.toSql(budgetTag),
       );
     }
+    if (!nullToAbsent || parentId != null) {
+      map['parent_id'] = Variable<String>(parentId);
+    }
     map['sort_order'] = Variable<int>(sortOrder);
     map['is_archived'] = Variable<bool>(isArchived);
     return map;
@@ -299,6 +326,9 @@ class CategoryItem extends DataClass implements Insertable<CategoryItem> {
       budgetTag: budgetTag == null && nullToAbsent
           ? const Value.absent()
           : Value(budgetTag),
+      parentId: parentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentId),
       sortOrder: Value(sortOrder),
       isArchived: Value(isArchived),
     );
@@ -321,6 +351,7 @@ class CategoryItem extends DataClass implements Insertable<CategoryItem> {
       budgetTag: $CategoriesTable.$converterbudgetTagn.fromJson(
         serializer.fromJson<String?>(json['budgetTag']),
       ),
+      parentId: serializer.fromJson<String?>(json['parentId']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       isArchived: serializer.fromJson<bool>(json['isArchived']),
     );
@@ -340,6 +371,7 @@ class CategoryItem extends DataClass implements Insertable<CategoryItem> {
       'budgetTag': serializer.toJson<String?>(
         $CategoriesTable.$converterbudgetTagn.toJson(budgetTag),
       ),
+      'parentId': serializer.toJson<String?>(parentId),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'isArchived': serializer.toJson<bool>(isArchived),
     };
@@ -353,6 +385,7 @@ class CategoryItem extends DataClass implements Insertable<CategoryItem> {
     CategoryKind? kind,
     String? iconKey,
     Value<BudgetTag?> budgetTag = const Value.absent(),
+    Value<String?> parentId = const Value.absent(),
     int? sortOrder,
     bool? isArchived,
   }) => CategoryItem(
@@ -363,6 +396,7 @@ class CategoryItem extends DataClass implements Insertable<CategoryItem> {
     kind: kind ?? this.kind,
     iconKey: iconKey ?? this.iconKey,
     budgetTag: budgetTag.present ? budgetTag.value : this.budgetTag,
+    parentId: parentId.present ? parentId.value : this.parentId,
     sortOrder: sortOrder ?? this.sortOrder,
     isArchived: isArchived ?? this.isArchived,
   );
@@ -375,6 +409,7 @@ class CategoryItem extends DataClass implements Insertable<CategoryItem> {
       kind: data.kind.present ? data.kind.value : this.kind,
       iconKey: data.iconKey.present ? data.iconKey.value : this.iconKey,
       budgetTag: data.budgetTag.present ? data.budgetTag.value : this.budgetTag,
+      parentId: data.parentId.present ? data.parentId.value : this.parentId,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       isArchived: data.isArchived.present
           ? data.isArchived.value
@@ -392,6 +427,7 @@ class CategoryItem extends DataClass implements Insertable<CategoryItem> {
           ..write('kind: $kind, ')
           ..write('iconKey: $iconKey, ')
           ..write('budgetTag: $budgetTag, ')
+          ..write('parentId: $parentId, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('isArchived: $isArchived')
           ..write(')'))
@@ -407,6 +443,7 @@ class CategoryItem extends DataClass implements Insertable<CategoryItem> {
     kind,
     iconKey,
     budgetTag,
+    parentId,
     sortOrder,
     isArchived,
   );
@@ -421,6 +458,7 @@ class CategoryItem extends DataClass implements Insertable<CategoryItem> {
           other.kind == this.kind &&
           other.iconKey == this.iconKey &&
           other.budgetTag == this.budgetTag &&
+          other.parentId == this.parentId &&
           other.sortOrder == this.sortOrder &&
           other.isArchived == this.isArchived);
 }
@@ -433,6 +471,7 @@ class CategoriesCompanion extends UpdateCompanion<CategoryItem> {
   final Value<CategoryKind> kind;
   final Value<String> iconKey;
   final Value<BudgetTag?> budgetTag;
+  final Value<String?> parentId;
   final Value<int> sortOrder;
   final Value<bool> isArchived;
   final Value<int> rowid;
@@ -444,6 +483,7 @@ class CategoriesCompanion extends UpdateCompanion<CategoryItem> {
     this.kind = const Value.absent(),
     this.iconKey = const Value.absent(),
     this.budgetTag = const Value.absent(),
+    this.parentId = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.isArchived = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -456,6 +496,7 @@ class CategoriesCompanion extends UpdateCompanion<CategoryItem> {
     required CategoryKind kind,
     required String iconKey,
     this.budgetTag = const Value.absent(),
+    this.parentId = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.isArchived = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -470,6 +511,7 @@ class CategoriesCompanion extends UpdateCompanion<CategoryItem> {
     Expression<String>? kind,
     Expression<String>? iconKey,
     Expression<String>? budgetTag,
+    Expression<String>? parentId,
     Expression<int>? sortOrder,
     Expression<bool>? isArchived,
     Expression<int>? rowid,
@@ -482,6 +524,7 @@ class CategoriesCompanion extends UpdateCompanion<CategoryItem> {
       if (kind != null) 'kind': kind,
       if (iconKey != null) 'icon_key': iconKey,
       if (budgetTag != null) 'budget_tag': budgetTag,
+      if (parentId != null) 'parent_id': parentId,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (isArchived != null) 'is_archived': isArchived,
       if (rowid != null) 'rowid': rowid,
@@ -496,6 +539,7 @@ class CategoriesCompanion extends UpdateCompanion<CategoryItem> {
     Value<CategoryKind>? kind,
     Value<String>? iconKey,
     Value<BudgetTag?>? budgetTag,
+    Value<String?>? parentId,
     Value<int>? sortOrder,
     Value<bool>? isArchived,
     Value<int>? rowid,
@@ -508,6 +552,7 @@ class CategoriesCompanion extends UpdateCompanion<CategoryItem> {
       kind: kind ?? this.kind,
       iconKey: iconKey ?? this.iconKey,
       budgetTag: budgetTag ?? this.budgetTag,
+      parentId: parentId ?? this.parentId,
       sortOrder: sortOrder ?? this.sortOrder,
       isArchived: isArchived ?? this.isArchived,
       rowid: rowid ?? this.rowid,
@@ -542,6 +587,9 @@ class CategoriesCompanion extends UpdateCompanion<CategoryItem> {
         $CategoriesTable.$converterbudgetTagn.toSql(budgetTag.value),
       );
     }
+    if (parentId.present) {
+      map['parent_id'] = Variable<String>(parentId.value);
+    }
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
     }
@@ -564,6 +612,7 @@ class CategoriesCompanion extends UpdateCompanion<CategoryItem> {
           ..write('kind: $kind, ')
           ..write('iconKey: $iconKey, ')
           ..write('budgetTag: $budgetTag, ')
+          ..write('parentId: $parentId, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('isArchived: $isArchived, ')
           ..write('rowid: $rowid')
@@ -2784,6 +2833,26 @@ class $TransactionsTable extends Transactions
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _payPeriodMeta = const VerificationMeta(
+    'payPeriod',
+  );
+  @override
+  late final GeneratedColumn<DateTime> payPeriod = GeneratedColumn<DateTime>(
+    'pay_period',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<PaymentMethod?, String>
+  paymentMethod = GeneratedColumn<String>(
+    'payment_method',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  ).withConverter<PaymentMethod?>($TransactionsTable.$converterpaymentMethodn);
   static const VerificationMeta _categoryIdMeta = const VerificationMeta(
     'categoryId',
   );
@@ -2848,6 +2917,8 @@ class $TransactionsTable extends Transactions
     currency,
     occurredAt,
     note,
+    payPeriod,
+    paymentMethod,
     categoryId,
     incomeSourceId,
     debtId,
@@ -2911,6 +2982,12 @@ class $TransactionsTable extends Transactions
       context.handle(
         _noteMeta,
         note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('pay_period')) {
+      context.handle(
+        _payPeriodMeta,
+        payPeriod.isAcceptableOrUnknown(data['pay_period']!, _payPeriodMeta),
       );
     }
     if (data.containsKey('category_id')) {
@@ -2986,6 +3063,16 @@ class $TransactionsTable extends Transactions
         DriftSqlType.string,
         data['${effectivePrefix}note'],
       ),
+      payPeriod: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}pay_period'],
+      ),
+      paymentMethod: $TransactionsTable.$converterpaymentMethodn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}payment_method'],
+        ),
+      ),
       categoryId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}category_id'],
@@ -3012,6 +3099,14 @@ class $TransactionsTable extends Transactions
 
   static JsonTypeConverter2<TransactionKind, String, String> $converterkind =
       const EnumNameConverter<TransactionKind>(TransactionKind.values);
+  static JsonTypeConverter2<PaymentMethod, String, String>
+  $converterpaymentMethod = const EnumNameConverter<PaymentMethod>(
+    PaymentMethod.values,
+  );
+  static JsonTypeConverter2<PaymentMethod?, String?, String?>
+  $converterpaymentMethodn = JsonTypeConverter2.asNullable(
+    $converterpaymentMethod,
+  );
 }
 
 class MoneyTransaction extends DataClass
@@ -3024,6 +3119,8 @@ class MoneyTransaction extends DataClass
   final String currency;
   final DateTime occurredAt;
   final String? note;
+  final DateTime? payPeriod;
+  final PaymentMethod? paymentMethod;
   final String? categoryId;
   final String? incomeSourceId;
   final String? debtId;
@@ -3037,6 +3134,8 @@ class MoneyTransaction extends DataClass
     required this.currency,
     required this.occurredAt,
     this.note,
+    this.payPeriod,
+    this.paymentMethod,
     this.categoryId,
     this.incomeSourceId,
     this.debtId,
@@ -3058,6 +3157,14 @@ class MoneyTransaction extends DataClass
     map['occurred_at'] = Variable<DateTime>(occurredAt);
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
+    }
+    if (!nullToAbsent || payPeriod != null) {
+      map['pay_period'] = Variable<DateTime>(payPeriod);
+    }
+    if (!nullToAbsent || paymentMethod != null) {
+      map['payment_method'] = Variable<String>(
+        $TransactionsTable.$converterpaymentMethodn.toSql(paymentMethod),
+      );
     }
     if (!nullToAbsent || categoryId != null) {
       map['category_id'] = Variable<String>(categoryId);
@@ -3084,6 +3191,12 @@ class MoneyTransaction extends DataClass
       currency: Value(currency),
       occurredAt: Value(occurredAt),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      payPeriod: payPeriod == null && nullToAbsent
+          ? const Value.absent()
+          : Value(payPeriod),
+      paymentMethod: paymentMethod == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paymentMethod),
       categoryId: categoryId == null && nullToAbsent
           ? const Value.absent()
           : Value(categoryId),
@@ -3115,6 +3228,10 @@ class MoneyTransaction extends DataClass
       currency: serializer.fromJson<String>(json['currency']),
       occurredAt: serializer.fromJson<DateTime>(json['occurredAt']),
       note: serializer.fromJson<String?>(json['note']),
+      payPeriod: serializer.fromJson<DateTime?>(json['payPeriod']),
+      paymentMethod: $TransactionsTable.$converterpaymentMethodn.fromJson(
+        serializer.fromJson<String?>(json['paymentMethod']),
+      ),
       categoryId: serializer.fromJson<String?>(json['categoryId']),
       incomeSourceId: serializer.fromJson<String?>(json['incomeSourceId']),
       debtId: serializer.fromJson<String?>(json['debtId']),
@@ -3135,6 +3252,10 @@ class MoneyTransaction extends DataClass
       'currency': serializer.toJson<String>(currency),
       'occurredAt': serializer.toJson<DateTime>(occurredAt),
       'note': serializer.toJson<String?>(note),
+      'payPeriod': serializer.toJson<DateTime?>(payPeriod),
+      'paymentMethod': serializer.toJson<String?>(
+        $TransactionsTable.$converterpaymentMethodn.toJson(paymentMethod),
+      ),
       'categoryId': serializer.toJson<String?>(categoryId),
       'incomeSourceId': serializer.toJson<String?>(incomeSourceId),
       'debtId': serializer.toJson<String?>(debtId),
@@ -3151,6 +3272,8 @@ class MoneyTransaction extends DataClass
     String? currency,
     DateTime? occurredAt,
     Value<String?> note = const Value.absent(),
+    Value<DateTime?> payPeriod = const Value.absent(),
+    Value<PaymentMethod?> paymentMethod = const Value.absent(),
     Value<String?> categoryId = const Value.absent(),
     Value<String?> incomeSourceId = const Value.absent(),
     Value<String?> debtId = const Value.absent(),
@@ -3164,6 +3287,10 @@ class MoneyTransaction extends DataClass
     currency: currency ?? this.currency,
     occurredAt: occurredAt ?? this.occurredAt,
     note: note.present ? note.value : this.note,
+    payPeriod: payPeriod.present ? payPeriod.value : this.payPeriod,
+    paymentMethod: paymentMethod.present
+        ? paymentMethod.value
+        : this.paymentMethod,
     categoryId: categoryId.present ? categoryId.value : this.categoryId,
     incomeSourceId: incomeSourceId.present
         ? incomeSourceId.value
@@ -3187,6 +3314,10 @@ class MoneyTransaction extends DataClass
           ? data.occurredAt.value
           : this.occurredAt,
       note: data.note.present ? data.note.value : this.note,
+      payPeriod: data.payPeriod.present ? data.payPeriod.value : this.payPeriod,
+      paymentMethod: data.paymentMethod.present
+          ? data.paymentMethod.value
+          : this.paymentMethod,
       categoryId: data.categoryId.present
           ? data.categoryId.value
           : this.categoryId,
@@ -3211,6 +3342,8 @@ class MoneyTransaction extends DataClass
           ..write('currency: $currency, ')
           ..write('occurredAt: $occurredAt, ')
           ..write('note: $note, ')
+          ..write('payPeriod: $payPeriod, ')
+          ..write('paymentMethod: $paymentMethod, ')
           ..write('categoryId: $categoryId, ')
           ..write('incomeSourceId: $incomeSourceId, ')
           ..write('debtId: $debtId, ')
@@ -3229,6 +3362,8 @@ class MoneyTransaction extends DataClass
     currency,
     occurredAt,
     note,
+    payPeriod,
+    paymentMethod,
     categoryId,
     incomeSourceId,
     debtId,
@@ -3246,6 +3381,8 @@ class MoneyTransaction extends DataClass
           other.currency == this.currency &&
           other.occurredAt == this.occurredAt &&
           other.note == this.note &&
+          other.payPeriod == this.payPeriod &&
+          other.paymentMethod == this.paymentMethod &&
           other.categoryId == this.categoryId &&
           other.incomeSourceId == this.incomeSourceId &&
           other.debtId == this.debtId &&
@@ -3261,6 +3398,8 @@ class TransactionsCompanion extends UpdateCompanion<MoneyTransaction> {
   final Value<String> currency;
   final Value<DateTime> occurredAt;
   final Value<String?> note;
+  final Value<DateTime?> payPeriod;
+  final Value<PaymentMethod?> paymentMethod;
   final Value<String?> categoryId;
   final Value<String?> incomeSourceId;
   final Value<String?> debtId;
@@ -3275,6 +3414,8 @@ class TransactionsCompanion extends UpdateCompanion<MoneyTransaction> {
     this.currency = const Value.absent(),
     this.occurredAt = const Value.absent(),
     this.note = const Value.absent(),
+    this.payPeriod = const Value.absent(),
+    this.paymentMethod = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.incomeSourceId = const Value.absent(),
     this.debtId = const Value.absent(),
@@ -3290,6 +3431,8 @@ class TransactionsCompanion extends UpdateCompanion<MoneyTransaction> {
     required String currency,
     required DateTime occurredAt,
     this.note = const Value.absent(),
+    this.payPeriod = const Value.absent(),
+    this.paymentMethod = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.incomeSourceId = const Value.absent(),
     this.debtId = const Value.absent(),
@@ -3308,6 +3451,8 @@ class TransactionsCompanion extends UpdateCompanion<MoneyTransaction> {
     Expression<String>? currency,
     Expression<DateTime>? occurredAt,
     Expression<String>? note,
+    Expression<DateTime>? payPeriod,
+    Expression<String>? paymentMethod,
     Expression<String>? categoryId,
     Expression<String>? incomeSourceId,
     Expression<String>? debtId,
@@ -3323,6 +3468,8 @@ class TransactionsCompanion extends UpdateCompanion<MoneyTransaction> {
       if (currency != null) 'currency': currency,
       if (occurredAt != null) 'occurred_at': occurredAt,
       if (note != null) 'note': note,
+      if (payPeriod != null) 'pay_period': payPeriod,
+      if (paymentMethod != null) 'payment_method': paymentMethod,
       if (categoryId != null) 'category_id': categoryId,
       if (incomeSourceId != null) 'income_source_id': incomeSourceId,
       if (debtId != null) 'debt_id': debtId,
@@ -3340,6 +3487,8 @@ class TransactionsCompanion extends UpdateCompanion<MoneyTransaction> {
     Value<String>? currency,
     Value<DateTime>? occurredAt,
     Value<String?>? note,
+    Value<DateTime?>? payPeriod,
+    Value<PaymentMethod?>? paymentMethod,
     Value<String?>? categoryId,
     Value<String?>? incomeSourceId,
     Value<String?>? debtId,
@@ -3355,6 +3504,8 @@ class TransactionsCompanion extends UpdateCompanion<MoneyTransaction> {
       currency: currency ?? this.currency,
       occurredAt: occurredAt ?? this.occurredAt,
       note: note ?? this.note,
+      payPeriod: payPeriod ?? this.payPeriod,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
       categoryId: categoryId ?? this.categoryId,
       incomeSourceId: incomeSourceId ?? this.incomeSourceId,
       debtId: debtId ?? this.debtId,
@@ -3392,6 +3543,14 @@ class TransactionsCompanion extends UpdateCompanion<MoneyTransaction> {
     if (note.present) {
       map['note'] = Variable<String>(note.value);
     }
+    if (payPeriod.present) {
+      map['pay_period'] = Variable<DateTime>(payPeriod.value);
+    }
+    if (paymentMethod.present) {
+      map['payment_method'] = Variable<String>(
+        $TransactionsTable.$converterpaymentMethodn.toSql(paymentMethod.value),
+      );
+    }
     if (categoryId.present) {
       map['category_id'] = Variable<String>(categoryId.value);
     }
@@ -3421,6 +3580,8 @@ class TransactionsCompanion extends UpdateCompanion<MoneyTransaction> {
           ..write('currency: $currency, ')
           ..write('occurredAt: $occurredAt, ')
           ..write('note: $note, ')
+          ..write('payPeriod: $payPeriod, ')
+          ..write('paymentMethod: $paymentMethod, ')
           ..write('categoryId: $categoryId, ')
           ..write('incomeSourceId: $incomeSourceId, ')
           ..write('debtId: $debtId, ')
@@ -4934,6 +5095,7 @@ typedef $$CategoriesTableCreateCompanionBuilder = CategoriesCompanion Function({
   required CategoryKind kind,
   required String iconKey,
   Value<BudgetTag?> budgetTag,
+  Value<String?> parentId,
   Value<int> sortOrder,
   Value<bool> isArchived,
   Value<int> rowid,
@@ -4946,6 +5108,7 @@ typedef $$CategoriesTableUpdateCompanionBuilder = CategoriesCompanion Function({
   Value<CategoryKind> kind,
   Value<String> iconKey,
   Value<BudgetTag?> budgetTag,
+  Value<String?> parentId,
   Value<int> sortOrder,
   Value<bool> isArchived,
   Value<int> rowid,
@@ -5019,6 +5182,11 @@ class $$CategoriesTableFilterComposer
         column: $table.budgetTag,
         builder: (column) => ColumnWithTypeConverterFilters(column),
       );
+
+  ColumnFilters<String> get parentId => $composableBuilder(
+    column: $table.parentId,
+    builder: (column) => ColumnFilters(column),
+  );
 
   ColumnFilters<int> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
@@ -5100,6 +5268,11 @@ class $$CategoriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get parentId => $composableBuilder(
+    column: $table.parentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
     builder: (column) => ColumnOrderings(column),
@@ -5140,6 +5313,9 @@ class $$CategoriesTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<BudgetTag?, String> get budgetTag =>
       $composableBuilder(column: $table.budgetTag, builder: (column) => column);
+
+  GeneratedColumn<String> get parentId =>
+      $composableBuilder(column: $table.parentId, builder: (column) => column);
 
   GeneratedColumn<int> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
@@ -5210,6 +5386,7 @@ class $$CategoriesTableTableManager
                 Value<CategoryKind> kind = const Value.absent(),
                 Value<String> iconKey = const Value.absent(),
                 Value<BudgetTag?> budgetTag = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<bool> isArchived = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -5221,6 +5398,7 @@ class $$CategoriesTableTableManager
                 kind: kind,
                 iconKey: iconKey,
                 budgetTag: budgetTag,
+                parentId: parentId,
                 sortOrder: sortOrder,
                 isArchived: isArchived,
                 rowid: rowid,
@@ -5234,6 +5412,7 @@ class $$CategoriesTableTableManager
                 required CategoryKind kind,
                 required String iconKey,
                 Value<BudgetTag?> budgetTag = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<bool> isArchived = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -5245,6 +5424,7 @@ class $$CategoriesTableTableManager
                 kind: kind,
                 iconKey: iconKey,
                 budgetTag: budgetTag,
+                parentId: parentId,
                 sortOrder: sortOrder,
                 isArchived: isArchived,
                 rowid: rowid,
@@ -6606,6 +6786,8 @@ typedef $$TransactionsTableCreateCompanionBuilder =
       required String currency,
       required DateTime occurredAt,
       Value<String?> note,
+      Value<DateTime?> payPeriod,
+      Value<PaymentMethod?> paymentMethod,
       Value<String?> categoryId,
       Value<String?> incomeSourceId,
       Value<String?> debtId,
@@ -6622,6 +6804,8 @@ typedef $$TransactionsTableUpdateCompanionBuilder =
       Value<String> currency,
       Value<DateTime> occurredAt,
       Value<String?> note,
+      Value<DateTime?> payPeriod,
+      Value<PaymentMethod?> paymentMethod,
       Value<String?> categoryId,
       Value<String?> incomeSourceId,
       Value<String?> debtId,
@@ -6773,6 +6957,17 @@ class $$TransactionsTableFilterComposer
   ColumnFilters<String> get note => $composableBuilder(
     column: $table.note,
     builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get payPeriod => $composableBuilder(
+    column: $table.payPeriod,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<PaymentMethod?, PaymentMethod, String>
+  get paymentMethod => $composableBuilder(
+    column: $table.paymentMethod,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
   $$CategoriesTableFilterComposer get categoryId {
@@ -6942,6 +7137,16 @@ class $$TransactionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get payPeriod => $composableBuilder(
+    column: $table.payPeriod,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get paymentMethod => $composableBuilder(
+    column: $table.paymentMethod,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$CategoriesTableOrderingComposer get categoryId {
     final $$CategoriesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -7071,6 +7276,15 @@ class $$TransactionsTableAnnotationComposer
 
   GeneratedColumn<String> get note =>
       $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get payPeriod =>
+      $composableBuilder(column: $table.payPeriod, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<PaymentMethod?, String> get paymentMethod =>
+      $composableBuilder(
+        column: $table.paymentMethod,
+        builder: (column) => column,
+      );
 
   $$CategoriesTableAnnotationComposer get categoryId {
     final $$CategoriesTableAnnotationComposer composer = $composerBuilder(
@@ -7232,6 +7446,8 @@ class $$TransactionsTableTableManager
                 Value<String> currency = const Value.absent(),
                 Value<DateTime> occurredAt = const Value.absent(),
                 Value<String?> note = const Value.absent(),
+                Value<DateTime?> payPeriod = const Value.absent(),
+                Value<PaymentMethod?> paymentMethod = const Value.absent(),
                 Value<String?> categoryId = const Value.absent(),
                 Value<String?> incomeSourceId = const Value.absent(),
                 Value<String?> debtId = const Value.absent(),
@@ -7246,6 +7462,8 @@ class $$TransactionsTableTableManager
                 currency: currency,
                 occurredAt: occurredAt,
                 note: note,
+                payPeriod: payPeriod,
+                paymentMethod: paymentMethod,
                 categoryId: categoryId,
                 incomeSourceId: incomeSourceId,
                 debtId: debtId,
@@ -7262,6 +7480,8 @@ class $$TransactionsTableTableManager
                 required String currency,
                 required DateTime occurredAt,
                 Value<String?> note = const Value.absent(),
+                Value<DateTime?> payPeriod = const Value.absent(),
+                Value<PaymentMethod?> paymentMethod = const Value.absent(),
                 Value<String?> categoryId = const Value.absent(),
                 Value<String?> incomeSourceId = const Value.absent(),
                 Value<String?> debtId = const Value.absent(),
@@ -7276,6 +7496,8 @@ class $$TransactionsTableTableManager
                 currency: currency,
                 occurredAt: occurredAt,
                 note: note,
+                payPeriod: payPeriod,
+                paymentMethod: paymentMethod,
                 categoryId: categoryId,
                 incomeSourceId: incomeSourceId,
                 debtId: debtId,

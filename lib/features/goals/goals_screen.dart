@@ -5,10 +5,14 @@ import 'package:intl/intl.dart';
 import '../../app/theme.dart';
 import '../../core/app_config.dart';
 import '../../core/category_icons.dart';
+import '../../core/dates.dart';
 import '../../core/money.dart';
+import '../../data/database.dart';
 import '../debts/add_debt_sheet.dart';
 import '../debts/debt_labels.dart';
 import '../debts/debt_providers.dart';
+import '../investments/investment_sheets.dart';
+import '../investments/investments_providers.dart';
 import '../savings/goal_sheet.dart';
 import '../savings/savings_labels.dart';
 import '../savings/savings_providers.dart';
@@ -24,6 +28,8 @@ class GoalsScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 112),
         children: const [
           _SavingsSection(),
+          SizedBox(height: 40),
+          _InvestmentsSection(),
           SizedBox(height: 40),
           _DebtsSection(),
         ],
@@ -296,6 +302,168 @@ class _GoalTile extends StatelessWidget {
                 'saved ${Money.format(g.savedMinor, currency)} so far.',
                 style: text.bodySmall?.copyWith(color: AppColors.mist),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// INVESTMENTS
+// ============================================================================
+
+class _InvestmentsSection extends ConsumerWidget {
+  const _InvestmentsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final overview = ref.watch(investmentsOverviewProvider);
+    final text = Theme.of(context).textTheme;
+    const currency = kDefaultCurrency;
+
+    return overview.when(
+      loading: () => const SizedBox(height: 80),
+      error: (e, _) => Text('Could not load investments.\n$e'),
+      data: (o) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (o.items.isNotEmpty) ...[
+            Text(
+              'Investments worth',
+              style: text.bodyMedium?.copyWith(color: AppColors.mist),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              Money.format(o.valueMinor, currency),
+              style: AppText.amount(34, weight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${formatGain(o.gainMinor, o.gainPercent)} on '
+              '${Money.format(o.contributedMinor, currency)} put in',
+              style: text.bodyMedium?.copyWith(
+                color: gainColor(o.gainMinor),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 28),
+          ],
+          _Header(
+            title: 'Investments',
+            actionLabel: 'Add',
+            onAction: () => showInvestmentSheet(context),
+          ),
+          const SizedBox(height: 8),
+          if (o.items.isEmpty)
+            Text(
+              'Track shares, funds, bonds, land, a business or a pension: '
+              'what you put in, what it is worth now, and how much it has grown.',
+              style: text.bodyMedium?.copyWith(color: AppColors.mist),
+            ),
+          for (final i in o.items) ...[
+            _InvestmentTile(progress: i),
+            const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _InvestmentTile extends StatelessWidget {
+  const _InvestmentTile({required this.progress});
+
+  final InvestmentProgress progress;
+
+  @override
+  Widget build(BuildContext context) {
+    const currency = kDefaultCurrency;
+    final text = Theme.of(context).textTheme;
+    final p = progress;
+    final type = p.goal.investmentType ?? InvestmentType.other;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => showInvestmentDetail(context, p.goal.id),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: AppColors.shallows,
+                  child: Icon(iconFor(type.iconKey), color: AppColors.deepWater),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        p.goal.name,
+                        style: text.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        type.label,
+                        style: text.bodySmall?.copyWith(color: AppColors.mist),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      Money.format(p.currentValueMinor, currency),
+                      style: AppText.amount(17),
+                    ),
+                    Text(
+                      'worth now',
+                      style: text.bodySmall?.copyWith(color: AppColors.mist),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  p.gainMinor >= 0
+                      ? Icons.trending_up_rounded
+                      : Icons.trending_down_rounded,
+                  size: 18,
+                  color: gainColor(p.gainMinor),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${formatGain(p.gainMinor, p.gainPercent)} over '
+                    '${describeSpan(p.startedOn, DateTime.now())}',
+                    style: text.bodyMedium?.copyWith(
+                      color: gainColor(p.gainMinor),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Put in ${Money.format(p.contributedMinor, currency)}'
+              '${p.lastUpdated == null ? '' : '. Value updated ${DateFormat.MMMd().format(p.lastUpdated!)}'}',
+              style: text.bodySmall?.copyWith(color: AppColors.mist),
+            ),
           ],
         ),
       ),

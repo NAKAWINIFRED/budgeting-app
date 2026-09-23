@@ -23,9 +23,18 @@ import '../savings/savings_providers.dart';
 
 /// Opens the quick-add sheet from anywhere in the app. Pass [existing] to
 /// edit or delete a transaction instead of adding a new one.
+///
+/// For a new entry, the optional [kind], [amountMinor], [goalId], [debtId]
+/// and [note] pre-fill the form (used by the month-end review and
+/// investments).
 Future<void> showQuickAddSheet(
   BuildContext context, {
   MoneyTransaction? existing,
+  TransactionKind? kind,
+  int? amountMinor,
+  String? goalId,
+  String? debtId,
+  String? note,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -33,7 +42,14 @@ Future<void> showQuickAddSheet(
     useSafeArea: true,
     showDragHandle: true,
     backgroundColor: Colors.white,
-    builder: (_) => QuickAddSheet(existing: existing),
+    builder: (_) => QuickAddSheet(
+      existing: existing,
+      initialKind: kind,
+      initialAmountMinor: amountMinor,
+      initialGoalId: goalId,
+      initialDebtId: debtId,
+      initialNote: note,
+    ),
   );
 }
 
@@ -79,9 +95,22 @@ extension on TransactionKind {
 }
 
 class QuickAddSheet extends ConsumerStatefulWidget {
-  const QuickAddSheet({super.key, this.existing});
+  const QuickAddSheet({
+    super.key,
+    this.existing,
+    this.initialKind,
+    this.initialAmountMinor,
+    this.initialGoalId,
+    this.initialDebtId,
+    this.initialNote,
+  });
 
   final MoneyTransaction? existing;
+  final TransactionKind? initialKind;
+  final int? initialAmountMinor;
+  final String? initialGoalId;
+  final String? initialDebtId;
+  final String? initialNote;
 
   @override
   ConsumerState<QuickAddSheet> createState() => _QuickAddSheetState();
@@ -121,6 +150,12 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     super.initState();
     final tx = widget.existing;
     if (tx == null) {
+      _kind = widget.initialKind ?? TransactionKind.expense;
+      _goalId = widget.initialGoalId;
+      _debtId = widget.initialDebtId;
+      _note.text = widget.initialNote ?? '';
+      final prefill = widget.initialAmountMinor;
+      if (prefill != null && prefill > 0) _amount.text = _amountText(prefill);
       // Pre-select the payment method used last time.
       ref.read(transactionsRepositoryProvider).lastPaymentMethod().then((m) {
         if (mounted && _method == null && m != null) setState(() => _method = m);

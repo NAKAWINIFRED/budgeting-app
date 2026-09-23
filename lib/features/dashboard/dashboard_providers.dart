@@ -99,9 +99,20 @@ class ActivityItem {
   return (DateTime(now.year, now.month), DateTime(now.year, now.month + 1));
 }
 
+/// This month's summary (home screen, Plan tab).
 final dashboardSummaryProvider = StreamProvider<DashboardSummary>((ref) {
-  final db = ref.watch(appDatabaseProvider);
+  final (start, _) = currentMonthRange();
+  return _watchMonthSummary(ref.watch(appDatabaseProvider), start);
+});
 
+/// Summary for any month, given its first day (used by the month review).
+final monthSummaryProvider =
+    StreamProvider.family<DashboardSummary, DateTime>((ref, monthStart) {
+  return _watchMonthSummary(ref.watch(appDatabaseProvider), monthStart);
+});
+
+Stream<DashboardSummary> _watchMonthSummary(AppDatabase db, DateTime start) {
+  final end = DateTime(start.year, start.month + 1);
   // Recalculates when transactions change AND when the user switches plans.
   return watchTables(
     db,
@@ -113,7 +124,6 @@ final dashboardSummaryProvider = StreamProvider<DashboardSummary>((ref) {
       db.savingsGoals,
     ],
     () async {
-      final (start, end) = currentMonthRange();
       final txs = await (db.select(db.transactions)
             ..where(
               (t) =>
@@ -124,7 +134,7 @@ final dashboardSummaryProvider = StreamProvider<DashboardSummary>((ref) {
       return _buildSummary(db, txs);
     },
   );
-});
+}
 
 final recentActivityProvider = StreamProvider<List<ActivityItem>>((ref) {
   final db = ref.watch(appDatabaseProvider);

@@ -8,7 +8,10 @@ import '../../app/theme.dart';
 import '../../core/money.dart';
 import '../../data/database_provider.dart';
 import '../../dev/sample_data.dart';
+import '../review/month_review.dart';
 import '../shared/activity_row.dart';
+import '../subscriptions/subscriptions_providers.dart';
+import '../subscriptions/subscriptions_screen.dart';
 import '../transactions/quick_add_sheet.dart';
 import 'dashboard_providers.dart';
 import 'tide_gauge.dart';
@@ -38,6 +41,8 @@ class DashboardScreen extends ConsumerWidget {
               const _Header(),
               const SizedBox(height: 20),
               _SafeToSpendCard(summary: s),
+              const MonthReviewCard(),
+              const _UpcomingSection(),
               const SizedBox(height: 36),
               _PlanSection(summary: s),
               const SizedBox(height: 28),
@@ -327,6 +332,75 @@ class _SampleDataButton extends ConsumerWidget {
         onPressed: () => insertSampleData(ref.read(appDatabaseProvider)),
         icon: const Icon(Icons.science_outlined),
         label: const Text('Load sample data (debug only)'),
+      ),
+    );
+  }
+}
+
+/// Bills and subscriptions due soon, with one-tap "Mark as paid".
+class _UpcomingSection extends ConsumerWidget {
+  const _UpcomingSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final subs = ref.watch(subscriptionsProvider).value ?? const [];
+    final text = Theme.of(context).textTheme;
+    void openAll() => context.push('/subscriptions');
+
+    if (subs.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: openAll,
+            icon: const Icon(Icons.autorenew_rounded, size: 20),
+            label: const Text('Add subscriptions & bills to get reminders'),
+          ),
+        ),
+      );
+    }
+
+    final due = subs.where((s) => s.needsAttention).toList();
+    if (due.isEmpty) {
+      final next = subs.first;
+      return Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: openAll,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.autorenew_rounded, color: AppColors.mist, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Next bill: ${next.name}, ${next.dueLabel.toLowerCase()}',
+                    style: text.bodyMedium?.copyWith(color: AppColors.mist),
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.mist),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(
+            title: 'Coming up',
+            actionLabel: 'See all',
+            onAction: openAll,
+          ),
+          for (final s in due) SubscriptionTile(subscription: s),
+        ],
       ),
     );
   }

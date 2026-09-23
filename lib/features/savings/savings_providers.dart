@@ -92,7 +92,7 @@ final savingsOverviewProvider = StreamProvider<SavingsOverview>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return watchTables(db, [db.savingsGoals, db.transactions], () async {
     final goals = await (db.select(db.savingsGoals)
-          ..where((g) => g.isArchived.equals(false))
+          ..where((g) => g.isArchived.equals(false) & g.isInvestment.equals(false))
           ..orderBy([(g) => OrderingTerm.asc(g.createdAt)]))
         .get();
 

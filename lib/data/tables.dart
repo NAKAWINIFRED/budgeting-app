@@ -37,6 +37,19 @@ enum SavingsTerm { shortTerm, longTerm }
 /// How money was paid or received.
 enum PaymentMethod { cash, mobileMoney, bank, card, other }
 
+enum SubscriptionFrequency { weekly, monthly, quarterly, yearly }
+
+enum InvestmentType {
+  stocks,
+  fund,
+  bonds,
+  crypto,
+  realEstate,
+  business,
+  pension,
+  other,
+}
+
 /// What a category, savings goal or debt "counts as" when a budget
 /// strategy splits income into buckets (e.g. 50% essentials).
 enum BudgetTag { essentials, wants, longTermSavings, shortTermSavings, debt }
@@ -105,6 +118,8 @@ class Transactions extends Table with SyncColumns {
   DateTimeColumn get payPeriod => dateTime().nullable()();
   // Cash, mobile money, bank or card. (Schema version 6.)
   TextColumn get paymentMethod => textEnum<PaymentMethod>().nullable()();
+  // Set when this expense paid a subscription or bill. (Schema version 7.)
+  TextColumn get subscriptionId => text().nullable()();
 
   TextColumn get categoryId =>
       text().nullable().references(Categories, #id)();
@@ -200,7 +215,54 @@ class SavingsGoals extends Table with SyncColumns {
   DateTimeColumn get targetDate => dateTime().nullable()();
   TextColumn get iconKey => text().nullable()();
   BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
+  // Investments are goals too: money put in = deposits. (Schema version 7.)
+  BoolColumn get isInvestment => boolean().withDefault(const Constant(false))();
+  TextColumn get investmentType => textEnum<InvestmentType>().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
+}
+
+/// What an investment was worth on a given day. Growth is measured
+/// against the money put in. (Schema version 7.)
+@DataClassName('InvestmentValuation')
+class InvestmentValuations extends Table with SyncColumns {
+  TextColumn get goalId =>
+      text().references(SavingsGoals, #id, onDelete: KeyAction.cascade)();
+  IntColumn get valueMinor => integer()();
+  DateTimeColumn get valuedOn => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Recurring payments: Netflix, rent, school fees, insurance...
+/// (Schema version 7.)
+@DataClassName('Subscription')
+class Subscriptions extends Table with SyncColumns {
+  TextColumn get name => text().withLength(min: 1, max: 60)();
+  // What it is for, e.g. "Family phone plan".
+  TextColumn get purpose => text().nullable()();
+  IntColumn get amountMinor => integer()();
+  TextColumn get currency => text().withLength(min: 3, max: 3)();
+  TextColumn get frequency => textEnum<SubscriptionFrequency>()();
+  DateTimeColumn get nextDueDate => dateTime()();
+  TextColumn get categoryId => text().nullable()();
+  TextColumn get paymentMethod => textEnum<PaymentMethod>().nullable()();
+  IntColumn get remindDaysBefore => integer().withDefault(const Constant(3))();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Small app settings and flags, e.g. "review for 2026-09 dismissed".
+/// (Schema version 7.)
+@DataClassName('KeyValue')
+class KeyValues extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+
+  @override
+  Set<Column> get primaryKey => {key};
 }

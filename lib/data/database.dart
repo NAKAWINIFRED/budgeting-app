@@ -20,6 +20,9 @@ part 'database.g.dart';
     BudgetBuckets,
     Debts,
     SavingsGoals,
+    InvestmentValuations,
+    Subscriptions,
+    KeyValues,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -28,7 +31,7 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   // Bump this every time a table changes, and add a step in onUpgrade.
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -70,6 +73,14 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 6) {
             await m.addColumn(transactions, transactions.paymentMethod);
+          }
+          if (from < 7) {
+            await m.addColumn(transactions, transactions.subscriptionId);
+            await m.addColumn(savingsGoals, savingsGoals.isInvestment);
+            await m.addColumn(savingsGoals, savingsGoals.investmentType);
+            await m.createTable(investmentValuations);
+            await m.createTable(subscriptions);
+            await m.createTable(keyValues);
           }
         },
         beforeOpen: (details) async {
