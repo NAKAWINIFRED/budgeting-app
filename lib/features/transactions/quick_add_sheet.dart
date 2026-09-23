@@ -1,25 +1,33 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../app/theme.dart';
+import '../../core/amount_input.dart';
 import '../../core/app_config.dart';
 import '../../core/category_icons.dart';
 import '../../core/money.dart';
 import '../../data/database.dart';
 import '../../data/lookups.dart';
 import '../../data/transactions_repository.dart';
+import '../debts/add_debt_sheet.dart';
+import '../debts/debt_labels.dart';
+import '../debts/debt_providers.dart';
 
-/// Opens the quick-add sheet from anywhere in the app.
-Future<void> showQuickAddSheet(BuildContext context) {
+/// Opens the quick-add sheet from anywhere in the app. Pass [existing] to
+/// edit or delete a transaction instead of adding a new one.
+Future<void> showQuickAddSheet(
+  BuildContext context, {
+  MoneyTransaction? existing,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
     backgroundColor: Colors.white,
-    builder: (_) => const QuickAddSheet(),
+    builder: (_) => QuickAddSheet(existing: existing),
   );
 }
 
@@ -65,7 +73,9 @@ extension on TransactionKind {
 }
 
 class QuickAddSheet extends ConsumerStatefulWidget {
-  const QuickAddSheet({super.key});
+  const QuickAddSheet({super.key, this.existing});
+
+  final MoneyTransaction? existing;
 
   @override
   ConsumerState<QuickAddSheet> createState() => _QuickAddSheetState();
@@ -84,6 +94,25 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   DateTime _date = DateUtils.dateOnly(DateTime.now());
   bool _saving = false;
 
+  bool get _isEditing => widget.existing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final tx = widget.existing;
+    if (tx == null) return;
+    _kind = tx.kind;
+    _categoryId = tx.categoryId;
+    _goalId = tx.savingsGoalId;
+    _debtId = tx.debtId;
+    _date = DateUtils.dateOnly(tx.occurredAt);
+    _note.text = tx.note ?? '';
+    final value = Money.fromMinor(tx.amountMinor, _currency);
+    _amount.text = value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toStringAsFixed(Money.fractionDigits(_currency));
+  }
+
   @override
   void dispose() {
     _amount.dispose();
@@ -91,10 +120,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     super.dispose();
   }
 
-  int get _amountMinor {
-    final value = double.tryParse(_amount.text.replaceAll(',', '.'));
-    return value == null ? 0 : Money.toMinor(value, _currency);
-  }
+  int get _amountMinor => parseAmountMinor(_amount.text, _currency);
 
   bool get _canSave {
     if (_saving || _amountMinor <= 0) return false;
@@ -140,13 +166,55 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     final kind = _kind;
+    final amount = _amountMinor;
     final now = DateTime.now();
     final note = _note.text.trim();
+
+    if (_isEditing) {
+      final old = widget.existing!;
+      try {
+        await repo.update(
+          old.copyWith(
+            kind: kind,
+            amountMinor: amount,
+            // Same day keeps the original time; a new day is stored at midday.
+            occurredAt: DateUtils.isSameDay(_date, old.occurredAt)
+                ? old.occurredAt
+                : DateTime(_date.year, _date.month, _date.day, 12),
+            categoryId: Value(_categoryId),
+            savingsGoalId: Value(_goalId),
+            debtId: Value(_debtId),
+            note: Value(note.isEmpty ? null : note),
+          ),
+        );
+        navigator.pop();
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text('Changes saved'),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () => repo.update(old),
+            ),
+          ),
+        );
+      } catch (e) {
+        setState(() => _saving = false);
+        messenger.showSnackBar(
+          SnackBar(content: Text('Could not save changes. ($e)')),
+        );
+      }
+      return;
+    }
+
+    // Debt progress before this payment, to spot milestones.
+    final debtBefore = kind == TransactionKind.debtPayment && _debtId != null
+        ? ref.read(debtOverviewProvider).value?.byId(_debtId!)
+        : null;
 
     try {
       final id = await repo.add(
         kind: kind,
-        amountMinor: _amountMinor,
+        amountMinor: amount,
         currency: _currency,
         // Today keeps the exact time; past days are stored at midday.
         occurredAt: DateUtils.isSameDay(_date, now)
@@ -159,9 +227,48 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
       );
 
       navigator.pop();
+
+      if (debtBefore != null &&
+          !debtBefore.isPaidOff &&
+          debtBefore.paidMinor + amount >= debtBefore.totalMinor) {
+        final debtName = debtBefore.debt.name;
+        await showDialog<void>(
+          context: navigator.context,
+          builder: (context) => AlertDialog(
+            icon: const Icon(
+              Icons.celebration_rounded,
+              size: 44,
+              color: AppColors.tide,
+            ),
+            title: Text('$debtName is paid off!'),
+            content: const Text(
+              'That is a huge step. The money that went to this debt is now '
+              'free for your savings and goals.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Done'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      final milestone = debtBefore == null
+          ? null
+          : milestoneMessage(
+              debtName: debtBefore.debt.name,
+              totalMinor: debtBefore.totalMinor,
+              paidBeforeMinor: debtBefore.paidMinor,
+              paymentMinor: amount,
+            );
+
       messenger.showSnackBar(
         SnackBar(
-          content: Text(kind.savedMessage),
+          content: Text(milestone ?? kind.savedMessage),
+          duration: Duration(seconds: milestone == null ? 4 : 6),
           action: SnackBarAction(label: 'Undo', onPressed: () => repo.delete(id)),
         ),
       );
@@ -171,6 +278,47 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
         SnackBar(content: Text('Could not save. Please try again. ($e)')),
       );
     }
+  }
+
+  Future<void> _addDebt() async {
+    final id = await showAddDebtSheet(context);
+    if (id != null && mounted) setState(() => _debtId = id);
+  }
+
+  Future<void> _delete() async {
+    final tx = widget.existing!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete this transaction?'),
+        content: const Text('It will be removed from your totals.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.buoyRed),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final repo = ref.read(transactionsRepositoryProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    await repo.delete(tx.id);
+    navigator.pop();
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Transaction deleted'),
+        action: SnackBarAction(label: 'Undo', onPressed: () => repo.restore(tx)),
+      ),
+    );
   }
 
   @override
@@ -189,7 +337,11 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
           children: [
             SegmentedButton<TransactionKind>(
               segments: [
-                for (final k in _kinds)
+                for (final k in [
+                  ..._kinds,
+                  if (widget.existing?.kind == TransactionKind.savingsWithdrawal)
+                    TransactionKind.savingsWithdrawal,
+                ])
                   ButtonSegment(value: k, label: Text(k.tabLabel)),
               ],
               selected: {_kind},
@@ -199,10 +351,10 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
             const SizedBox(height: 16),
             TextField(
               controller: _amount,
-              autofocus: true,
+              autofocus: !_isEditing,
               keyboardType: TextInputType.numberWithOptions(decimal: digits > 0),
               textInputAction: TextInputAction.done,
-              inputFormatters: [_amountFormatter(digits)],
+              inputFormatters: [amountInputFormatter(_currency)],
               style: AppText.amount(40, weight: FontWeight.w800),
               decoration: InputDecoration(
                 border: InputBorder.none,
@@ -260,8 +412,17 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                         color: Colors.white,
                       ),
                     )
-                  : Text(_kind.saveLabel),
+                  : Text(_isEditing ? 'Save changes' : _kind.saveLabel),
             ),
+            if (_isEditing) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _saving ? null : _delete,
+                style: TextButton.styleFrom(foregroundColor: AppColors.buoyRed),
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('Delete transaction'),
+              ),
+            ],
           ],
         ),
       ),
@@ -315,24 +476,43 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
           );
     }
 
-    // Debt payment
+    // Debt payment. Watching the overview keeps it loaded, so milestones
+    // can be detected the moment a payment is saved.
+    ref.watch(debtOverviewProvider);
+    final addDebtChip = ActionChip(
+      avatar: const Icon(Icons.add_rounded, size: 18, color: AppColors.tide),
+      label: const Text('Add a debt'),
+      backgroundColor: Colors.white,
+      shape: const StadiumBorder(),
+      side: const BorderSide(color: AppColors.tide),
+      onPressed: _addDebt,
+    );
+
     return ref.watch(activeDebtsProvider).when(
           loading: () => const SizedBox(height: 40),
           error: (e, _) => Text('Could not load debts. ($e)'),
-          data: (debts) => debts.isEmpty
-              ? Text(
-                  'No debts added yet. You will be able to add them in the Goals tab.',
+          data: (debts) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (debts.isEmpty) ...[
+                Text(
+                  'Add the debt you are paying, like a car loan or money from a friend.',
                   style: muted,
-                )
-              : _chipWrap([
-                  for (final d in debts)
-                    _choice(
-                      label: d.name,
-                      icon: Icons.payments_rounded,
-                      selected: _debtId == d.id,
-                      onTap: () => setState(() => _debtId = d.id),
-                    ),
-                ]),
+                ),
+                const SizedBox(height: 10),
+              ],
+              _chipWrap([
+                for (final d in debts)
+                  _choice(
+                    label: d.name,
+                    icon: d.debtType.icon,
+                    selected: _debtId == d.id,
+                    onTap: () => setState(() => _debtId = d.id),
+                  ),
+                addDebtChip,
+              ]),
+            ],
+          ),
         );
   }
 
@@ -361,16 +541,4 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
       onSelected: (_) => onTap(),
     );
   }
-}
-
-/// Only allows valid amounts: digits plus, for currencies with cents,
-/// one decimal separator (. or ,) and the right number of decimals.
-TextInputFormatter _amountFormatter(int digits) {
-  final pattern = digits > 0
-      ? RegExp('^\\d{0,12}([.,]\\d{0,$digits})?\$')
-      : RegExp(r'^\d{0,12}$');
-  return TextInputFormatter.withFunction(
-    (oldValue, newValue) =>
-        pattern.hasMatch(newValue.text) ? newValue : oldValue,
-  );
 }

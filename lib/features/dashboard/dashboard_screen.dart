@@ -5,10 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../app/theme.dart';
-import '../../core/category_icons.dart';
 import '../../core/money.dart';
 import '../../data/database_provider.dart';
 import '../../dev/sample_data.dart';
+import '../shared/activity_row.dart';
+import '../transactions/quick_add_sheet.dart';
 import 'dashboard_providers.dart';
 import 'tide_gauge.dart';
 
@@ -262,66 +263,19 @@ class _RecentActivitySection extends ConsumerWidget {
                   children: [
                     for (var i = 0; i < items.length; i++) ...[
                       if (i > 0) const Divider(),
-                      _ActivityRow(item: items[i], currency: currency),
+                      ActivityRow(
+                        item: items[i],
+                        currency: currency,
+                        onTap: () => showQuickAddSheet(
+                          context,
+                          existing: items[i].tx,
+                        ),
+                      ),
                     ],
                   ],
                 ),
         ),
       ],
-    );
-  }
-}
-
-class _ActivityRow extends StatelessWidget {
-  const _ActivityRow({required this.item, required this.currency});
-
-  final ActivityItem item;
-  final String currency;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final sign = item.isIncoming ? '+' : '\u2212';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.shallows,
-            child: Icon(
-              iconFor(item.iconKey),
-              size: 20,
-              color: AppColors.deepWater,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  style: text.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  DateFormat.MMMd().format(item.tx.occurredAt),
-                  style: text.bodySmall?.copyWith(color: AppColors.mist),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            '$sign${Money.format(item.tx.amountMinor, currency)}',
-            style: AppText.amount(
-              15,
-              color: item.isIncoming ? AppColors.tide : AppColors.deepWater,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

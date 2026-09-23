@@ -39,6 +39,14 @@ class TransactionsRepository {
     return id;
   }
 
+  Future<void> update(MoneyTransaction tx) => _db
+      .update(_db.transactions)
+      .replace(tx.copyWith(updatedAt: DateTime.now()));
+
+  /// Puts back a deleted transaction exactly as it was (used by Undo).
+  Future<void> restore(MoneyTransaction tx) =>
+      _db.into(_db.transactions).insert(tx);
+
   Future<void> delete(String id) =>
       (_db.delete(_db.transactions)..where((t) => t.id.equals(id))).go();
 }

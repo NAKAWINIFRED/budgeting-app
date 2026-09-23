@@ -26,13 +26,21 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 1;
+  // Bump this every time a table changes, and add a step in onUpgrade.
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
           await m.createAll();
           await _seedDefaults();
+        },
+        onUpgrade: (m, from, to) async {
+          // Runs on phones that already have an older database, so nobody
+          // loses their data when the app updates.
+          if (from < 2) {
+            await m.addColumn(debts, debts.paidBeforeTrackingMinor);
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');

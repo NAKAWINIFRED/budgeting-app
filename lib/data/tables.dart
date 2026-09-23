@@ -133,13 +133,17 @@ class BudgetBuckets extends Table with SyncColumns {
 }
 
 /// Payments are Transactions with kind = debtPayment and this debt's id.
-/// Remaining balance = originalAmountMinor - sum(payments).
+/// Remaining = originalAmountMinor - paidBeforeTrackingMinor - sum(payments).
 @DataClassName('Debt')
 class Debts extends Table with SyncColumns {
   TextColumn get name => text().withLength(min: 1, max: 60)();
   TextColumn get debtType => textEnum<DebtType>()();
   TextColumn get lender => text().nullable()();
   IntColumn get originalAmountMinor => integer()();
+  // Amount already repaid before the user started tracking in Tidewise,
+  // so their earlier progress still counts. (Added in schema version 2.)
+  IntColumn get paidBeforeTrackingMinor =>
+      integer().withDefault(const Constant(0))();
   TextColumn get currency => text().withLength(min: 3, max: 3)();
   // Basis points again: 1250 = 12.5% interest per year.
   IntColumn get interestRateBasisPoints => integer().nullable()();

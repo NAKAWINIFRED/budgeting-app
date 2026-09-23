@@ -1182,6 +1182,18 @@ class $DebtsTable extends Debts with TableInfo<$DebtsTable, Debt> {
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _paidBeforeTrackingMinorMeta =
+      const VerificationMeta('paidBeforeTrackingMinor');
+  @override
+  late final GeneratedColumn<int> paidBeforeTrackingMinor =
+      GeneratedColumn<int>(
+        'paid_before_tracking_minor',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0),
+      );
   static const VerificationMeta _currencyMeta = const VerificationMeta(
     'currency',
   );
@@ -1273,6 +1285,7 @@ class $DebtsTable extends Debts with TableInfo<$DebtsTable, Debt> {
     debtType,
     lender,
     originalAmountMinor,
+    paidBeforeTrackingMinor,
     currency,
     interestRateBasisPoints,
     minimumPaymentMinor,
@@ -1332,6 +1345,15 @@ class $DebtsTable extends Debts with TableInfo<$DebtsTable, Debt> {
       );
     } else if (isInserting) {
       context.missing(_originalAmountMinorMeta);
+    }
+    if (data.containsKey('paid_before_tracking_minor')) {
+      context.handle(
+        _paidBeforeTrackingMinorMeta,
+        paidBeforeTrackingMinor.isAcceptableOrUnknown(
+          data['paid_before_tracking_minor']!,
+          _paidBeforeTrackingMinorMeta,
+        ),
+      );
     }
     if (data.containsKey('currency')) {
       context.handle(
@@ -1425,6 +1447,10 @@ class $DebtsTable extends Debts with TableInfo<$DebtsTable, Debt> {
         DriftSqlType.int,
         data['${effectivePrefix}original_amount_minor'],
       )!,
+      paidBeforeTrackingMinor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}paid_before_tracking_minor'],
+      )!,
       currency: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}currency'],
@@ -1473,6 +1499,7 @@ class Debt extends DataClass implements Insertable<Debt> {
   final DebtType debtType;
   final String? lender;
   final int originalAmountMinor;
+  final int paidBeforeTrackingMinor;
   final String currency;
   final int? interestRateBasisPoints;
   final int? minimumPaymentMinor;
@@ -1488,6 +1515,7 @@ class Debt extends DataClass implements Insertable<Debt> {
     required this.debtType,
     this.lender,
     required this.originalAmountMinor,
+    required this.paidBeforeTrackingMinor,
     required this.currency,
     this.interestRateBasisPoints,
     this.minimumPaymentMinor,
@@ -1512,6 +1540,7 @@ class Debt extends DataClass implements Insertable<Debt> {
       map['lender'] = Variable<String>(lender);
     }
     map['original_amount_minor'] = Variable<int>(originalAmountMinor);
+    map['paid_before_tracking_minor'] = Variable<int>(paidBeforeTrackingMinor);
     map['currency'] = Variable<String>(currency);
     if (!nullToAbsent || interestRateBasisPoints != null) {
       map['interest_rate_basis_points'] = Variable<int>(
@@ -1545,6 +1574,7 @@ class Debt extends DataClass implements Insertable<Debt> {
           ? const Value.absent()
           : Value(lender),
       originalAmountMinor: Value(originalAmountMinor),
+      paidBeforeTrackingMinor: Value(paidBeforeTrackingMinor),
       currency: Value(currency),
       interestRateBasisPoints: interestRateBasisPoints == null && nullToAbsent
           ? const Value.absent()
@@ -1580,6 +1610,9 @@ class Debt extends DataClass implements Insertable<Debt> {
       originalAmountMinor: serializer.fromJson<int>(
         json['originalAmountMinor'],
       ),
+      paidBeforeTrackingMinor: serializer.fromJson<int>(
+        json['paidBeforeTrackingMinor'],
+      ),
       currency: serializer.fromJson<String>(json['currency']),
       interestRateBasisPoints: serializer.fromJson<int?>(
         json['interestRateBasisPoints'],
@@ -1606,6 +1639,9 @@ class Debt extends DataClass implements Insertable<Debt> {
       ),
       'lender': serializer.toJson<String?>(lender),
       'originalAmountMinor': serializer.toJson<int>(originalAmountMinor),
+      'paidBeforeTrackingMinor': serializer.toJson<int>(
+        paidBeforeTrackingMinor,
+      ),
       'currency': serializer.toJson<String>(currency),
       'interestRateBasisPoints': serializer.toJson<int?>(
         interestRateBasisPoints,
@@ -1626,6 +1662,7 @@ class Debt extends DataClass implements Insertable<Debt> {
     DebtType? debtType,
     Value<String?> lender = const Value.absent(),
     int? originalAmountMinor,
+    int? paidBeforeTrackingMinor,
     String? currency,
     Value<int?> interestRateBasisPoints = const Value.absent(),
     Value<int?> minimumPaymentMinor = const Value.absent(),
@@ -1641,6 +1678,8 @@ class Debt extends DataClass implements Insertable<Debt> {
     debtType: debtType ?? this.debtType,
     lender: lender.present ? lender.value : this.lender,
     originalAmountMinor: originalAmountMinor ?? this.originalAmountMinor,
+    paidBeforeTrackingMinor:
+        paidBeforeTrackingMinor ?? this.paidBeforeTrackingMinor,
     currency: currency ?? this.currency,
     interestRateBasisPoints: interestRateBasisPoints.present
         ? interestRateBasisPoints.value
@@ -1666,6 +1705,9 @@ class Debt extends DataClass implements Insertable<Debt> {
       originalAmountMinor: data.originalAmountMinor.present
           ? data.originalAmountMinor.value
           : this.originalAmountMinor,
+      paidBeforeTrackingMinor: data.paidBeforeTrackingMinor.present
+          ? data.paidBeforeTrackingMinor.value
+          : this.paidBeforeTrackingMinor,
       currency: data.currency.present ? data.currency.value : this.currency,
       interestRateBasisPoints: data.interestRateBasisPoints.present
           ? data.interestRateBasisPoints.value
@@ -1692,6 +1734,7 @@ class Debt extends DataClass implements Insertable<Debt> {
           ..write('debtType: $debtType, ')
           ..write('lender: $lender, ')
           ..write('originalAmountMinor: $originalAmountMinor, ')
+          ..write('paidBeforeTrackingMinor: $paidBeforeTrackingMinor, ')
           ..write('currency: $currency, ')
           ..write('interestRateBasisPoints: $interestRateBasisPoints, ')
           ..write('minimumPaymentMinor: $minimumPaymentMinor, ')
@@ -1712,6 +1755,7 @@ class Debt extends DataClass implements Insertable<Debt> {
     debtType,
     lender,
     originalAmountMinor,
+    paidBeforeTrackingMinor,
     currency,
     interestRateBasisPoints,
     minimumPaymentMinor,
@@ -1731,6 +1775,7 @@ class Debt extends DataClass implements Insertable<Debt> {
           other.debtType == this.debtType &&
           other.lender == this.lender &&
           other.originalAmountMinor == this.originalAmountMinor &&
+          other.paidBeforeTrackingMinor == this.paidBeforeTrackingMinor &&
           other.currency == this.currency &&
           other.interestRateBasisPoints == this.interestRateBasisPoints &&
           other.minimumPaymentMinor == this.minimumPaymentMinor &&
@@ -1748,6 +1793,7 @@ class DebtsCompanion extends UpdateCompanion<Debt> {
   final Value<DebtType> debtType;
   final Value<String?> lender;
   final Value<int> originalAmountMinor;
+  final Value<int> paidBeforeTrackingMinor;
   final Value<String> currency;
   final Value<int?> interestRateBasisPoints;
   final Value<int?> minimumPaymentMinor;
@@ -1764,6 +1810,7 @@ class DebtsCompanion extends UpdateCompanion<Debt> {
     this.debtType = const Value.absent(),
     this.lender = const Value.absent(),
     this.originalAmountMinor = const Value.absent(),
+    this.paidBeforeTrackingMinor = const Value.absent(),
     this.currency = const Value.absent(),
     this.interestRateBasisPoints = const Value.absent(),
     this.minimumPaymentMinor = const Value.absent(),
@@ -1781,6 +1828,7 @@ class DebtsCompanion extends UpdateCompanion<Debt> {
     required DebtType debtType,
     this.lender = const Value.absent(),
     required int originalAmountMinor,
+    this.paidBeforeTrackingMinor = const Value.absent(),
     required String currency,
     this.interestRateBasisPoints = const Value.absent(),
     this.minimumPaymentMinor = const Value.absent(),
@@ -1801,6 +1849,7 @@ class DebtsCompanion extends UpdateCompanion<Debt> {
     Expression<String>? debtType,
     Expression<String>? lender,
     Expression<int>? originalAmountMinor,
+    Expression<int>? paidBeforeTrackingMinor,
     Expression<String>? currency,
     Expression<int>? interestRateBasisPoints,
     Expression<int>? minimumPaymentMinor,
@@ -1819,6 +1868,8 @@ class DebtsCompanion extends UpdateCompanion<Debt> {
       if (lender != null) 'lender': lender,
       if (originalAmountMinor != null)
         'original_amount_minor': originalAmountMinor,
+      if (paidBeforeTrackingMinor != null)
+        'paid_before_tracking_minor': paidBeforeTrackingMinor,
       if (currency != null) 'currency': currency,
       if (interestRateBasisPoints != null)
         'interest_rate_basis_points': interestRateBasisPoints,
@@ -1840,6 +1891,7 @@ class DebtsCompanion extends UpdateCompanion<Debt> {
     Value<DebtType>? debtType,
     Value<String?>? lender,
     Value<int>? originalAmountMinor,
+    Value<int>? paidBeforeTrackingMinor,
     Value<String>? currency,
     Value<int?>? interestRateBasisPoints,
     Value<int?>? minimumPaymentMinor,
@@ -1857,6 +1909,8 @@ class DebtsCompanion extends UpdateCompanion<Debt> {
       debtType: debtType ?? this.debtType,
       lender: lender ?? this.lender,
       originalAmountMinor: originalAmountMinor ?? this.originalAmountMinor,
+      paidBeforeTrackingMinor:
+          paidBeforeTrackingMinor ?? this.paidBeforeTrackingMinor,
       currency: currency ?? this.currency,
       interestRateBasisPoints:
           interestRateBasisPoints ?? this.interestRateBasisPoints,
@@ -1894,6 +1948,11 @@ class DebtsCompanion extends UpdateCompanion<Debt> {
     }
     if (originalAmountMinor.present) {
       map['original_amount_minor'] = Variable<int>(originalAmountMinor.value);
+    }
+    if (paidBeforeTrackingMinor.present) {
+      map['paid_before_tracking_minor'] = Variable<int>(
+        paidBeforeTrackingMinor.value,
+      );
     }
     if (currency.present) {
       map['currency'] = Variable<String>(currency.value);
@@ -1934,6 +1993,7 @@ class DebtsCompanion extends UpdateCompanion<Debt> {
           ..write('debtType: $debtType, ')
           ..write('lender: $lender, ')
           ..write('originalAmountMinor: $originalAmountMinor, ')
+          ..write('paidBeforeTrackingMinor: $paidBeforeTrackingMinor, ')
           ..write('currency: $currency, ')
           ..write('interestRateBasisPoints: $interestRateBasisPoints, ')
           ..write('minimumPaymentMinor: $minimumPaymentMinor, ')
@@ -5081,6 +5141,7 @@ typedef $$DebtsTableCreateCompanionBuilder = DebtsCompanion Function({
   required DebtType debtType,
   Value<String?> lender,
   required int originalAmountMinor,
+  Value<int> paidBeforeTrackingMinor,
   required String currency,
   Value<int?> interestRateBasisPoints,
   Value<int?> minimumPaymentMinor,
@@ -5098,6 +5159,7 @@ typedef $$DebtsTableUpdateCompanionBuilder = DebtsCompanion Function({
   Value<DebtType> debtType,
   Value<String?> lender,
   Value<int> originalAmountMinor,
+  Value<int> paidBeforeTrackingMinor,
   Value<String> currency,
   Value<int?> interestRateBasisPoints,
   Value<int?> minimumPaymentMinor,
@@ -5172,6 +5234,11 @@ class $$DebtsTableFilterComposer extends Composer<_$AppDatabase, $DebtsTable> {
 
   ColumnFilters<int> get originalAmountMinor => $composableBuilder(
     column: $table.originalAmountMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get paidBeforeTrackingMinor => $composableBuilder(
+    column: $table.paidBeforeTrackingMinor,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5280,6 +5347,11 @@ class $$DebtsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get paidBeforeTrackingMinor => $composableBuilder(
+    column: $table.paidBeforeTrackingMinor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get currency => $composableBuilder(
     column: $table.currency,
     builder: (column) => ColumnOrderings(column),
@@ -5345,6 +5417,11 @@ class $$DebtsTableAnnotationComposer
 
   GeneratedColumn<int> get originalAmountMinor => $composableBuilder(
     column: $table.originalAmountMinor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get paidBeforeTrackingMinor => $composableBuilder(
+    column: $table.paidBeforeTrackingMinor,
     builder: (column) => column,
   );
 
@@ -5436,6 +5513,7 @@ class $$DebtsTableTableManager
                 Value<DebtType> debtType = const Value.absent(),
                 Value<String?> lender = const Value.absent(),
                 Value<int> originalAmountMinor = const Value.absent(),
+                Value<int> paidBeforeTrackingMinor = const Value.absent(),
                 Value<String> currency = const Value.absent(),
                 Value<int?> interestRateBasisPoints = const Value.absent(),
                 Value<int?> minimumPaymentMinor = const Value.absent(),
@@ -5452,6 +5530,7 @@ class $$DebtsTableTableManager
                 debtType: debtType,
                 lender: lender,
                 originalAmountMinor: originalAmountMinor,
+                paidBeforeTrackingMinor: paidBeforeTrackingMinor,
                 currency: currency,
                 interestRateBasisPoints: interestRateBasisPoints,
                 minimumPaymentMinor: minimumPaymentMinor,
@@ -5470,6 +5549,7 @@ class $$DebtsTableTableManager
                 required DebtType debtType,
                 Value<String?> lender = const Value.absent(),
                 required int originalAmountMinor,
+                Value<int> paidBeforeTrackingMinor = const Value.absent(),
                 required String currency,
                 Value<int?> interestRateBasisPoints = const Value.absent(),
                 Value<int?> minimumPaymentMinor = const Value.absent(),
@@ -5486,6 +5566,7 @@ class $$DebtsTableTableManager
                 debtType: debtType,
                 lender: lender,
                 originalAmountMinor: originalAmountMinor,
+                paidBeforeTrackingMinor: paidBeforeTrackingMinor,
                 currency: currency,
                 interestRateBasisPoints: interestRateBasisPoints,
                 minimumPaymentMinor: minimumPaymentMinor,

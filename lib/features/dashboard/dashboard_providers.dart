@@ -104,20 +104,24 @@ final recentActivityProvider = StreamProvider<List<ActivityItem>>((ref) {
     ])
     ..limit(6);
 
-  return query.watch().asyncMap((txs) async {
-    final categories = {
-      for (final c in await db.select(db.categories).get()) c.id: c,
-    };
-    final goals = {
-      for (final g in await db.select(db.savingsGoals).get()) g.id: g,
-    };
-    final debts = {for (final d in await db.select(db.debts).get()) d.id: d};
-
-    return [
-      for (final tx in txs) _describe(tx, categories, goals, debts),
-    ];
-  });
+  return query.watch().asyncMap((txs) => describeTransactions(db, txs));
 });
+
+/// Turns raw transactions into display-ready items (title + icon).
+Future<List<ActivityItem>> describeTransactions(
+  AppDatabase db,
+  List<MoneyTransaction> txs,
+) async {
+  final categories = {
+    for (final c in await db.select(db.categories).get()) c.id: c,
+  };
+  final goals = {
+    for (final g in await db.select(db.savingsGoals).get()) g.id: g,
+  };
+  final debts = {for (final d in await db.select(db.debts).get()) d.id: d};
+
+  return [for (final tx in txs) _describe(tx, categories, goals, debts)];
+}
 
 // ============================================================================
 // CALCULATIONS

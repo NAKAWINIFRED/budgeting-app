@@ -1,6 +1,8 @@
 import 'package:go_router/go_router.dart';
 
+import '../features/activity/activity_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
+import '../features/goals/goals_screen.dart';
 import '../features/shared/coming_soon_screen.dart';
 import 'app_shell.dart';
 
@@ -25,11 +27,7 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/activity',
-              builder: (context, state) => const ComingSoonScreen(
-                title: 'Activity',
-                message:
-                    'Every income, expense, saving and debt payment will be listed here.',
-              ),
+              builder: (context, state) => const ActivityScreen(),
             ),
           ],
         ),
@@ -49,11 +47,7 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/goals',
-              builder: (context, state) => const ComingSoonScreen(
-                title: 'Goals',
-                message:
-                    'Your savings goals and debts, with progress and what is left to pay.',
-              ),
+              builder: (context, state) => const GoalsScreen(),
             ),
           ],
         ),
