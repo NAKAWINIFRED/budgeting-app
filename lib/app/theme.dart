@@ -15,6 +15,8 @@ class AppColors {
   static const lagoon = Color(0xFF2A6FD1); // income: money coming in
   static const expense = Color(0xFFD64545); // expenses: money going out
   static const growth = Color(0xFF2E9D57); // investments going up
+  static const debtWater = Color(0xFF4A1F25); // gauge background when in debt
+  static const deepDebtWater = Color(0xFF34121A); // ...when debt is deep
   static const line = Color(0xFFE1E9EA); // dividers, empty progress bars
 }
 

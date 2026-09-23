@@ -70,7 +70,7 @@ class MonthReviewCard extends ConsumerWidget {
     final debts = ref.watch(debtOverviewProvider).value;
     final investments = ref.watch(investmentsOverviewProvider).value;
 
-    const currency = kDefaultCurrency;
+    final currency = kDefaultCurrency;
     final text = Theme.of(context).textTheme;
     final monthName = DateFormat.MMMM().format(month);
     final income = summary.incomeMinor;
@@ -196,7 +196,7 @@ class MonthReviewCard extends ConsumerWidget {
     DebtOverview? debts,
     InvestmentsOverview? investments,
   ) {
-    const currency = kDefaultCurrency;
+    final currency = kDefaultCurrency;
     String fmt(int m) => Money.format(m, currency);
 
     final activeDebts =

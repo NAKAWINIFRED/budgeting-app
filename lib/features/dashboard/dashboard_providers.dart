@@ -46,6 +46,7 @@ class DashboardSummary {
     required this.buckets,
     required this.categories,
     required this.spentByCategory,
+    required this.expenseMinor,
   });
 
   final String currency;
@@ -59,6 +60,9 @@ class DashboardSummary {
 
   /// This month's spending per category id.
   final Map<String, int> spentByCategory;
+
+  /// Everything recorded as an expense this month.
+  final int expenseMinor;
 
   int get safeToSpendMinor => incomeMinor - outflowMinor;
 
@@ -219,6 +223,7 @@ Future<DashboardSummary> _buildSummary(
 
   var income = 0;
   var outflow = 0;
+  var expenses = 0;
   final usedByTag = {for (final t in BudgetTag.values) t: 0};
   final spentByCategory = <String, int>{};
 
@@ -230,6 +235,7 @@ Future<DashboardSummary> _buildSummary(
         income += amount;
       case TransactionKind.expense:
         outflow += amount;
+        expenses += amount;
         final tag = categories[tx.categoryId]?.budgetTag ?? BudgetTag.wants;
         usedByTag[tag] = usedByTag[tag]! + amount;
         final categoryId = tx.categoryId;
@@ -258,6 +264,7 @@ Future<DashboardSummary> _buildSummary(
     strategy: strategy,
     categories: categories,
     spentByCategory: spentByCategory,
+    expenseMinor: expenses,
     buckets: [
       for (final b in buckets)
         BucketProgress(

@@ -39,6 +39,10 @@ enum PaymentMethod { cash, mobileMoney, bank, card, other }
 
 enum SubscriptionFrequency { weekly, monthly, quarterly, yearly }
 
+/// Which expenses page a top-level expense category appears on.
+/// (Subscription payments always go to the Subscriptions page.)
+enum ExpenseGroup { daily, billsHousing, other }
+
 enum InvestmentType {
   stocks,
   fund,
@@ -83,6 +87,9 @@ class Categories extends Table with SyncColumns {
   // Set for subcategories, e.g. Electricity -> Bills & Utilities.
   // Null for top-level categories. (Schema version 5.)
   TextColumn get parentId => text().nullable()();
+  // Expense categories only: daily, bills & housing, or other.
+  // Subcategories follow their parent. (Schema version 8.)
+  TextColumn get expenseGroup => textEnum<ExpenseGroup>().nullable()();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
   BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
 

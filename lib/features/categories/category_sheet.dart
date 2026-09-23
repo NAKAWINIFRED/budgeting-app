@@ -48,6 +48,7 @@ class _CategorySheetState extends ConsumerState<CategorySheet> {
   final _name = TextEditingController();
   late String _iconKey;
   late BudgetTag _tag;
+  late ExpenseGroup _group;
   bool _saving = false;
 
   bool get _isEditing => widget.existing != null;
@@ -66,6 +67,7 @@ class _CategorySheetState extends ConsumerState<CategorySheet> {
         widget.parent?.iconKey ??
         (widget.kind == CategoryKind.income ? 'work' : 'more_horiz');
     _tag = e?.budgetTag ?? widget.parent?.budgetTag ?? BudgetTag.essentials;
+    _group = e?.expenseGroup ?? ExpenseGroup.daily;
   }
 
   @override
@@ -99,6 +101,7 @@ class _CategorySheetState extends ConsumerState<CategorySheet> {
           name: name,
           iconKey: _iconKey,
           budgetTag: _showTag ? Value(_tag) : Value(existing.budgetTag),
+          expenseGroup: _showTag ? Value(_group) : Value(existing.expenseGroup),
         ),
       );
       navigator.pop(existing.id);
@@ -108,6 +111,7 @@ class _CategorySheetState extends ConsumerState<CategorySheet> {
         kind: widget.kind,
         iconKey: _iconKey,
         budgetTag: widget.kind == CategoryKind.expense ? _tag : null,
+        expenseGroup: _group,
         parentId: widget.parent?.id,
       );
       navigator.pop(id);
@@ -206,6 +210,25 @@ class _CategorySheetState extends ConsumerState<CategorySheet> {
                     ? 'Needs are costs you must pay to live and work.'
                     : 'Wants make life enjoyable but could be paused if needed.',
                 style: text.bodySmall?.copyWith(color: AppColors.mist),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Which expenses page should it appear on?',
+                style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<ExpenseGroup>(
+                segments: const [
+                  ButtonSegment(value: ExpenseGroup.daily, label: Text('Daily')),
+                  ButtonSegment(
+                    value: ExpenseGroup.billsHousing,
+                    label: Text('Bills & housing'),
+                  ),
+                  ButtonSegment(value: ExpenseGroup.other, label: Text('Other')),
+                ],
+                selected: {_group},
+                showSelectedIcon: false,
+                onSelectionChanged: (s) => setState(() => _group = s.first),
               ),
             ],
             const SizedBox(height: 16),

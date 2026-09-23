@@ -14,11 +14,17 @@ class TideGauge extends StatefulWidget {
     required this.level,
     required this.child,
     this.height = 220,
+    this.background = AppColors.deepWater,
+    this.water = AppColors.tide,
   });
 
   final double level;
   final Widget child;
   final double height;
+
+  /// The card and water colors. They turn red when money is in trouble.
+  final Color background;
+  final Color water;
 
   @override
   State<TideGauge> createState() => _TideGaugeState();
@@ -57,7 +63,7 @@ class _TideGaugeState extends State<TideGauge>
       child: SizedBox(
         height: widget.height,
         child: ColoredBox(
-          color: AppColors.deepWater,
+          color: widget.background,
           child: TweenAnimationBuilder<double>(
             tween: Tween(begin: 0, end: target),
             duration: const Duration(milliseconds: 1100),
@@ -65,7 +71,11 @@ class _TideGaugeState extends State<TideGauge>
             builder: (context, level, child) => AnimatedBuilder(
               animation: _wave,
               builder: (context, child) => CustomPaint(
-                painter: _TidePainter(level: level, phase: _wave.value),
+                painter: _TidePainter(
+                  level: level,
+                  phase: _wave.value,
+                  water: widget.water,
+                ),
                 child: child,
               ),
               child: child,
@@ -82,10 +92,15 @@ class _TideGaugeState extends State<TideGauge>
 }
 
 class _TidePainter extends CustomPainter {
-  _TidePainter({required this.level, required this.phase});
+  _TidePainter({
+    required this.level,
+    required this.phase,
+    required this.water,
+  });
 
   final double level;
   final double phase;
+  final Color water;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -102,7 +117,7 @@ class _TidePainter extends CustomPainter {
       baseY: baseY - 5,
       amplitude: 6,
       angle: -angle + math.pi / 2,
-      color: AppColors.tide.withValues(alpha: 0.35),
+      color: water.withValues(alpha: 0.35),
     );
     _drawWave(
       canvas,
@@ -110,7 +125,7 @@ class _TidePainter extends CustomPainter {
       baseY: baseY,
       amplitude: 7,
       angle: angle,
-      color: AppColors.tide,
+      color: water,
     );
   }
 
@@ -136,5 +151,5 @@ class _TidePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_TidePainter old) =>
-      old.level != level || old.phase != phase;
+      old.level != level || old.phase != phase || old.water != water;
 }

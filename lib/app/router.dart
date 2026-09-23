@@ -1,69 +1,83 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/app_config.dart';
+import '../data/database.dart';
 import '../features/activity/activity_screen.dart';
 import '../features/categories/categories_screen.dart';
-import '../features/subscriptions/subscriptions_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
+import '../features/expenses/expenses_providers.dart';
+import '../features/expenses/expenses_screens.dart';
 import '../features/goals/goals_screen.dart';
+import '../features/income/income_screen.dart';
+import '../features/onboarding/onboarding_screen.dart';
 import '../features/plan/plan_screen.dart';
-import '../data/database.dart';
-import 'app_shell.dart';
+import '../features/settings/settings_screen.dart';
 
-/// All app navigation lives here. Each tab keeps its own history, so
-/// switching tabs doesn't lose your place.
+/// Every page in the app. The side menu (app_drawer.dart) links to these.
 final appRouter = GoRouter(
   initialLocation: '/',
+  // First launch: show onboarding until it is finished.
+  redirect: (context, state) {
+    final onWelcome = state.uri.path == '/welcome';
+    if (!AppConfig.onboardingDone && !onWelcome) return '/welcome';
+    if (AppConfig.onboardingDone && onWelcome) return '/';
+    return null;
+  },
   routes: [
-    // Full-screen pages that open on top of the tabs.
     GoRoute(
-      path: '/categories',
-      builder: (context, state) => CategoriesScreen(
+      path: '/welcome',
+      builder: (context, state) => const OnboardingScreen(),
+    ),
+    _page('/', (_) => const DashboardScreen()),
+    _page('/income', (_) => const IncomeScreen()),
+    _page('/expenses', (_) => const ExpensesOverviewScreen()),
+    _page(
+      '/expenses/daily',
+      (_) => const ExpenseSectionScreen(section: ExpenseSection.daily),
+    ),
+    _page(
+      '/expenses/bills',
+      (_) => const ExpenseSectionScreen(section: ExpenseSection.billsHousing),
+    ),
+    _page(
+      '/expenses/subscriptions',
+      (_) => const ExpenseSectionScreen(section: ExpenseSection.subscriptions),
+    ),
+    _page(
+      '/expenses/other',
+      (_) => const ExpenseSectionScreen(section: ExpenseSection.other),
+    ),
+    _page('/activity', (_) => const ActivityScreen()),
+    _page('/savings', (_) => const SavingsScreen()),
+    _page('/investments', (_) => const InvestmentsScreen()),
+    _page('/debts', (_) => const DebtsScreen()),
+    _page('/plan', (_) => const PlanScreen()),
+    _page('/settings', (_) => const SettingsScreen()),
+    _page(
+      '/categories',
+      (state) => CategoriesScreen(
         initialKind: state.uri.queryParameters['kind'] == 'income'
             ? CategoryKind.income
             : CategoryKind.expense,
       ),
     ),
-    GoRoute(
-      path: '/subscriptions',
-      builder: (context, state) => const SubscriptionsScreen(),
-    ),
-    StatefulShellRoute.indexedStack(
-      builder: (context, state, navigationShell) =>
-          AppShell(navigationShell: navigationShell),
-      branches: [
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/',
-              builder: (context, state) => const DashboardScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/activity',
-              builder: (context, state) => const ActivityScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/plan',
-              builder: (context, state) => const PlanScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/goals',
-              builder: (context, state) => const GoalsScreen(),
-            ),
-          ],
-        ),
-      ],
-    ),
+    // Older links.
+    GoRoute(path: '/subscriptions', redirect: (_, __) => '/expenses/subscriptions'),
+    GoRoute(path: '/goals', redirect: (_, __) => '/savings'),
   ],
 );
+
+GoRoute _page(String path, Widget Function(GoRouterState state) build) {
+  return GoRoute(
+    path: path,
+    // A quick fade between pages feels calmer than a slide from the menu.
+    pageBuilder: (context, state) => CustomTransitionPage(
+      key: state.pageKey,
+      child: build(state),
+      transitionDuration: const Duration(milliseconds: 200),
+      transitionsBuilder: (context, animation, _, child) =>
+          FadeTransition(opacity: animation, child: child),
+    ),
+  );
+}

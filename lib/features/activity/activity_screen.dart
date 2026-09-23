@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/main_scaffold.dart';
 import '../../app/theme.dart';
 import '../../core/app_config.dart';
 import '../../core/money.dart';
@@ -27,11 +28,11 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     final activity = ref.watch(monthActivityProvider);
     final filter = ref.watch(activityFilterProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Activity')),
+    return MainScaffold(
+      title: 'Activity',
       body: Column(
         children: [
-          const _MonthSwitcher(),
+          const MonthSwitcher(),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
             child: SizedBox(
@@ -68,8 +69,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
 
 // ----------------------------------------------------------------------------
 
-class _MonthSwitcher extends ConsumerWidget {
-  const _MonthSwitcher();
+class MonthSwitcher extends ConsumerWidget {
+  const MonthSwitcher({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -162,7 +163,7 @@ class _ActivityList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const currency = kDefaultCurrency;
+    final currency = kDefaultCurrency;
     final text = Theme.of(context).textTheme;
     final items = activity.items.where(filter.matches).toList();
 
@@ -238,7 +239,7 @@ class _MonthTotals extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const currency = kDefaultCurrency;
+    final currency = kDefaultCurrency;
     return Row(
       children: [
         _Stat(

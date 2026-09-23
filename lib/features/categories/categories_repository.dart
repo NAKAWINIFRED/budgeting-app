@@ -38,6 +38,7 @@ class CategoriesRepository {
     required CategoryKind kind,
     required String iconKey,
     BudgetTag? budgetTag,
+    ExpenseGroup? expenseGroup,
     String? parentId,
   }) async {
     final id = const Uuid().v4();
@@ -64,6 +65,11 @@ class CategoriesRepository {
             kind: kind,
             iconKey: iconKey,
             budgetTag: Value(kind == CategoryKind.expense ? budgetTag : null),
+            expenseGroup: Value(
+              kind == CategoryKind.expense && parentId == null
+                  ? (expenseGroup ?? ExpenseGroup.other)
+                  : null,
+            ),
             parentId: Value(parentId),
             sortOrder: Value(nextOrder),
           ),

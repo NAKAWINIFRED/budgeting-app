@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/main_scaffold.dart';
 import '../../app/theme.dart';
 import '../../core/app_config.dart';
 import '../../core/category_icons.dart';
@@ -17,25 +18,52 @@ import '../savings/goal_sheet.dart';
 import '../savings/savings_labels.dart';
 import '../savings/savings_providers.dart';
 
-class GoalsScreen extends StatelessWidget {
-  const GoalsScreen({super.key});
+/// Savings goals and how saving is going.
+class SavingsScreen extends StatelessWidget {
+  const SavingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Goals')),
-      body: ListView(
+  Widget build(BuildContext context) => const MainScaffold(
+        title: 'Savings',
+        addKind: TransactionKind.savingsDeposit,
+        body: _Page(child: _SavingsSection()),
+      );
+}
+
+/// Investments and how they are growing.
+class InvestmentsScreen extends StatelessWidget {
+  const InvestmentsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const MainScaffold(
+        title: 'Investments',
+        addKind: TransactionKind.savingsDeposit,
+        body: _Page(child: _InvestmentsSection()),
+      );
+}
+
+/// Debts and how fast they are going down.
+class DebtsScreen extends StatelessWidget {
+  const DebtsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const MainScaffold(
+        title: 'Debt',
+        addKind: TransactionKind.debtPayment,
+        body: _Page(child: _DebtsSection()),
+      );
+}
+
+class _Page extends StatelessWidget {
+  const _Page({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 112),
-        children: const [
-          _SavingsSection(),
-          SizedBox(height: 40),
-          _InvestmentsSection(),
-          SizedBox(height: 40),
-          _DebtsSection(),
-        ],
-      ),
-    );
-  }
+        children: [child],
+      );
 }
 
 class _Header extends StatelessWidget {
@@ -83,7 +111,7 @@ class _SavingsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(savingsOverviewProvider);
     final text = Theme.of(context).textTheme;
-    const currency = kDefaultCurrency;
+    final currency = kDefaultCurrency;
 
     return overview.when(
       loading: () => const SizedBox(height: 120),
@@ -171,7 +199,7 @@ class _GoalTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const currency = kDefaultCurrency;
+    final currency = kDefaultCurrency;
     final text = Theme.of(context).textTheme;
     final g = progress;
     final goal = g.goal;
@@ -320,7 +348,7 @@ class _InvestmentsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(investmentsOverviewProvider);
     final text = Theme.of(context).textTheme;
-    const currency = kDefaultCurrency;
+    final currency = kDefaultCurrency;
 
     return overview.when(
       loading: () => const SizedBox(height: 80),
@@ -378,7 +406,7 @@ class _InvestmentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const currency = kDefaultCurrency;
+    final currency = kDefaultCurrency;
     final text = Theme.of(context).textTheme;
     final p = progress;
     final type = p.goal.investmentType ?? InvestmentType.other;
@@ -520,7 +548,7 @@ class _DebtSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const currency = kDefaultCurrency;
+    final currency = kDefaultCurrency;
     final text = Theme.of(context).textTheme;
     final o = overview;
     final color = debtProgressColor(o.progress);
@@ -581,7 +609,7 @@ class _DebtTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const currency = kDefaultCurrency;
+    final currency = kDefaultCurrency;
     final text = Theme.of(context).textTheme;
     final p = progress;
     final debt = p.debt;

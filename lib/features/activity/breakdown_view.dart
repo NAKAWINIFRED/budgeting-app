@@ -28,7 +28,7 @@ class _BreakdownViewState extends ConsumerState<BreakdownView> {
       _income ? monthIncomeBreakdownProvider : monthBreakdownProvider,
     );
     final text = Theme.of(context).textTheme;
-    const currency = kDefaultCurrency;
+    final currency = kDefaultCurrency;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 112),
@@ -117,7 +117,7 @@ class _BreakdownViewState extends ConsumerState<BreakdownView> {
                   style: text.bodyMedium?.copyWith(color: AppColors.mist),
                 ),
               for (final g in b.groups)
-                _GroupTile(
+                BreakdownGroupTile(
                   group: g,
                   grandTotal: b.totalMinor,
                   currency: currency,
@@ -149,8 +149,9 @@ class _BreakdownViewState extends ConsumerState<BreakdownView> {
   }
 }
 
-class _GroupTile extends StatefulWidget {
-  const _GroupTile({
+class BreakdownGroupTile extends StatefulWidget {
+  const BreakdownGroupTile({
+    super.key,
     required this.group,
     required this.grandTotal,
     required this.currency,
@@ -163,10 +164,10 @@ class _GroupTile extends StatefulWidget {
   final Color barColor;
 
   @override
-  State<_GroupTile> createState() => _GroupTileState();
+  State<BreakdownGroupTile> createState() => _BreakdownGroupTileState();
 }
 
-class _GroupTileState extends State<_GroupTile> {
+class _BreakdownGroupTileState extends State<BreakdownGroupTile> {
   bool _open = false;
 
   @override

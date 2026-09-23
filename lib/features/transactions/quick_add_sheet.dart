@@ -117,7 +117,7 @@ class QuickAddSheet extends ConsumerStatefulWidget {
 }
 
 class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
-  static const _currency = kDefaultCurrency;
+  static String get _currency => kDefaultCurrency;
 
   final _amount = TextEditingController();
   final _note = TextEditingController();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/main_scaffold.dart';
 import '../../app/theme.dart';
 import '../../core/category_icons.dart';
 import '../../data/database.dart';
@@ -25,8 +26,8 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
     final tree = ref.watch(categoryTreeProvider(_kind));
     final text = Theme.of(context).textTheme;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Categories')),
+    return MainScaffold(
+      title: 'Categories',
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showCategorySheet(context, kind: _kind),
         icon: const Icon(Icons.add_rounded),

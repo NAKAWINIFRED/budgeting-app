@@ -37,7 +37,7 @@ class SubscriptionSheet extends ConsumerStatefulWidget {
 }
 
 class _SubscriptionSheetState extends ConsumerState<SubscriptionSheet> {
-  static const _currency = kDefaultCurrency;
+  static String get _currency => kDefaultCurrency;
 
   final _name = TextEditingController();
   final _purpose = TextEditingController();

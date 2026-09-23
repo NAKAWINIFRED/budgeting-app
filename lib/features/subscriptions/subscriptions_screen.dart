@@ -32,66 +32,6 @@ Future<void> markSubscriptionPaid(
   );
 }
 
-class SubscriptionsScreen extends ConsumerWidget {
-  const SubscriptionsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final subs = ref.watch(subscriptionsProvider);
-    final text = Theme.of(context).textTheme;
-    const currency = kDefaultCurrency;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Subscriptions & bills')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showSubscriptionSheet(context),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add'),
-        shape: const StadiumBorder(),
-      ),
-      body: subs.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Could not load subscriptions.\n$e')),
-        data: (list) {
-          final monthly = list.fold<int>(
-            0,
-            (sum, s) => sum + s.frequency.monthlyMinor(s.amountMinor),
-          );
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 112),
-            children: [
-              if (list.isEmpty) ...[
-                Text(
-                  'Add the things you pay again and again: rent, phone, '
-                  'internet, streaming, school fees, insurance. Tidewise '
-                  'will remind you before each one is due.',
-                  style: text.bodyMedium?.copyWith(color: AppColors.mist),
-                ),
-              ] else ...[
-                Text(
-                  'All together, about',
-                  style: text.bodyMedium?.copyWith(color: AppColors.mist),
-                ),
-                Text(
-                  '${Money.format(monthly, currency)} a month',
-                  style: AppText.amount(30, weight: FontWeight.w800, color: AppColors.expense),
-                ),
-                Text(
-                  'That is ${Money.format(monthly * 12, currency)} a year. '
-                  'Worth checking now and then for anything you no longer use.',
-                  style: text.bodySmall?.copyWith(color: AppColors.mist),
-                ),
-                const SizedBox(height: 20),
-                for (final s in list) SubscriptionTile(subscription: s),
-              ],
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
 class SubscriptionTile extends ConsumerWidget {
   const SubscriptionTile({super.key, required this.subscription});
 
@@ -101,7 +41,7 @@ class SubscriptionTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = subscription;
     final text = Theme.of(context).textTheme;
-    const currency = kDefaultCurrency;
+    final currency = kDefaultCurrency;
     final dueColor = s.isOverdue
         ? AppColors.expense
         : s.needsAttention

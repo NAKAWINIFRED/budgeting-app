@@ -29,7 +29,7 @@ class AddDebtSheet extends ConsumerStatefulWidget {
 }
 
 class _AddDebtSheetState extends ConsumerState<AddDebtSheet> {
-  static const _currency = kDefaultCurrency;
+  static String get _currency => kDefaultCurrency;
 
   final _name = TextEditingController();
   final _lender = TextEditingController();

@@ -14,7 +14,7 @@ import '../savings/savings_providers.dart';
 import '../transactions/quick_add_sheet.dart';
 import 'investments_providers.dart';
 
-const _currency = kDefaultCurrency;
+String get _currency => kDefaultCurrency;
 
 InputDecoration _decoration(String label, {String? helper, bool money = false}) {
   return InputDecoration(

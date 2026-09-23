@@ -8,7 +8,7 @@ import '../data/database.dart';
 /// Fills the current month with realistic test data so we can see the
 /// dashboard working. Only reachable from a button in debug builds.
 Future<void> insertSampleData(AppDatabase db) async {
-  const currency = kDefaultCurrency;
+  final currency = kDefaultCurrency;
   const uuid = Uuid();
   final now = DateTime.now();
 

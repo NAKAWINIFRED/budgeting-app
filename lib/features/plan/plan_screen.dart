@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/main_scaffold.dart';
 import '../../app/theme.dart';
 import '../../core/amount_input.dart';
 import '../../core/app_config.dart';
@@ -26,8 +27,8 @@ class PlanScreen extends ConsumerWidget {
     final summary = ref.watch(dashboardSummaryProvider);
     final options = ref.watch(strategyOptionsProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Plan')),
+    return MainScaffold(
+      title: 'Budget plan',
       body: summary.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Could not load your plan.\n$e')),
@@ -336,8 +337,18 @@ class _Calculator extends StatefulWidget {
 }
 
 class _CalculatorState extends State<_Calculator> {
-  static const _currency = kDefaultCurrency;
+  static String get _currency => kDefaultCurrency;
   final _amount = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Start with the rough monthly income from onboarding, if shared.
+    final typical = AppConfig.typicalIncomeMinor;
+    if (typical != null && typical > 0) {
+      _amount.text = Money.fromMinor(typical, _currency).round().toString();
+    }
+  }
 
   @override
   void dispose() {

@@ -31,7 +31,7 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   // Bump this every time a table changes, and add a step in onUpgrade.
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -82,6 +82,10 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(subscriptions);
             await m.createTable(keyValues);
           }
+          if (from < 8) {
+            await m.addColumn(categories, categories.expenseGroup);
+            await _assignExpenseGroups();
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
@@ -89,6 +93,27 @@ class AppDatabase extends _$AppDatabase {
       );
 
   static QueryExecutor _openConnection() => driftDatabase(name: 'tidewise');
+
+  /// Deletes every record and restores the starter categories and plans,
+  /// exactly like a fresh install. Used by Settings, "Erase everything".
+  Future<void> eraseEverything() => transaction(() async {
+        final tables = <TableInfo>[
+          transactionItems,
+          investmentValuations,
+          transactions,
+          subscriptions,
+          budgetBuckets,
+          budgetStrategies,
+          categories,
+          debts,
+          savingsGoals,
+          keyValues,
+        ];
+        for (final table in tables) {
+          await delete(table).go();
+        }
+        await _seedDefaults();
+      });
 
   // --------------------------------------------------------------------------
   // First-launch defaults: starter categories and preset budget strategies.
@@ -226,6 +251,32 @@ class AppDatabase extends _$AppDatabase {
           ..limit(1))
         .getSingleOrNull();
     if (bills != null) await _seedBillSubcategories(bills.id);
+    await _assignExpenseGroups();
+  }
+
+  /// Puts the starter expense categories on the right expenses page.
+  /// Anything not listed shows under "Other expenses".
+  Future<void> _assignExpenseGroups() async {
+    const groups = {
+      ExpenseGroup.billsHousing: [
+        'Housing & Rent',
+        'Bills & Utilities',
+        'Phone & Internet',
+      ],
+      ExpenseGroup.daily: [
+        'Groceries',
+        'Home Supplies',
+        'Transport',
+        'Dining Out',
+        'Entertainment',
+        'Shopping',
+        'Personal Care',
+      ],
+    };
+    for (final entry in groups.entries) {
+      await (update(categories)..where((c) => c.name.isIn(entry.value)))
+          .write(CategoriesCompanion(expenseGroup: Value(entry.key)));
+    }
   }
 
   Future<void> _seedBillSubcategories(String parentId) async {

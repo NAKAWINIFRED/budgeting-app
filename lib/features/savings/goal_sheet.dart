@@ -35,7 +35,7 @@ class GoalSheet extends ConsumerStatefulWidget {
 }
 
 class _GoalSheetState extends ConsumerState<GoalSheet> {
-  static const _currency = kDefaultCurrency;
+  static String get _currency => kDefaultCurrency;
 
   final _name = TextEditingController();
   final _target = TextEditingController();
