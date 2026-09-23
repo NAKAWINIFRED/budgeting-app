@@ -14,6 +14,8 @@ import '../../data/database_provider.dart';
 import '../../data/key_values.dart';
 import '../dashboard/dashboard_providers.dart';
 import '../onboarding/onboarding_screen.dart' show PayRhythm, PayRhythmX;
+import '../subscriptions/bill_reminders.dart';
+import '../subscriptions/subscriptions_providers.dart';
 import 'export_csv.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -129,6 +131,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     AppConfig.typicalIncomeMinor = minor > 0 ? minor : null;
     await _store.set(SettingKeys.typicalIncome, minor > 0 ? '$minor' : '');
     setState(() {});
+  }
+
+  Future<void> _toggleReminders(bool on) async {
+    AppConfig.billReminders = on;
+    await _store.set(SettingKeys.billReminders, on ? 'true' : 'false');
+    setState(() {});
+    final subs = ref.read(subscriptionsProvider).value ?? const [];
+    await BillReminders.reschedule(subs);
+  }
+
+  Future<void> _testNotification() async {
+    final allowed = await BillReminders.showTest();
+    if (!mounted || allowed) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Notifications are turned off for Tidewise. You can allow them in '
+          'your phone settings under Apps > Tidewise > Notifications.',
+        ),
+      ),
+    );
   }
 
   Future<void> _export() async {
@@ -249,6 +272,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 : Money.format(typical, AppConfig.currency),
             onTap: _editTypicalIncome,
           ),
+          section('Reminders'),
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+            secondary: const Icon(
+              Icons.notifications_active_outlined,
+              color: AppColors.deepWater,
+            ),
+            title: Text(
+              'Bill reminders',
+              style: text.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              'A notification before each subscription or bill is due, and on '
+              'the day itself',
+              style: text.bodyMedium?.copyWith(color: AppColors.mist),
+            ),
+            value: AppConfig.billReminders,
+            activeTrackColor: AppColors.tide,
+            onChanged: _toggleReminders,
+          ),
+          if (AppConfig.billReminders)
+            tile(
+              icon: Icons.notifications_none_rounded,
+              title: 'Send a test notification',
+              value: 'Check that reminders reach you',
+              onTap: _testNotification,
+            ),
           section('Planning'),
           tile(
             icon: Icons.donut_large_rounded,

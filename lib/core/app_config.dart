@@ -16,6 +16,9 @@ class AppConfig {
   static int? typicalIncomeMinor;
 
   static bool onboardingDone = false;
+
+  /// Phone notifications before bills are due.
+  static bool billReminders = true;
 }
 
 /// The currency the whole app displays.
@@ -30,4 +33,5 @@ class SettingKeys {
   static const payRhythm = 'pay_rhythm';
   static const typicalIncome = 'typical_income_minor';
   static const onboardingDone = 'onboarding_done';
+  static const billReminders = 'bill_reminders';
 }
