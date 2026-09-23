@@ -1,3 +1,5 @@
+import 'dart:ui' show Color;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
@@ -29,6 +31,8 @@ class BillReminders {
       channelDescription: 'Reminders before subscriptions and bills are due',
       importance: Importance.high,
       priority: Priority.high,
+      icon: 'ic_notification',
+      color: Color(0xFF1C7C7D), // Tidewise teal
     ),
     iOS: DarwinNotificationDetails(),
   );
@@ -38,7 +42,7 @@ class BillReminders {
       tzdata.initializeTimeZones();
       await _plugin.initialize(
         settings: const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          android: AndroidInitializationSettings('@drawable/ic_notification'),
           iOS: DarwinInitializationSettings(
             // We ask later, when the user has bills to be reminded about.
             requestAlertPermission: false,
