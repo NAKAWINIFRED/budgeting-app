@@ -29,6 +29,8 @@ class TransactionsRepository {
     String? savingsGoalId,
     String? debtId,
     String? note,
+    DateTime? payPeriod,
+    PaymentMethod? paymentMethod,
     List<ItemDraft> items = const [],
   }) async {
     final id = const Uuid().v4();
@@ -44,6 +46,8 @@ class TransactionsRepository {
               savingsGoalId: Value(savingsGoalId),
               debtId: Value(debtId),
               note: Value(note),
+              payPeriod: Value(payPeriod),
+              paymentMethod: Value(paymentMethod),
             ),
           );
       await _insertItems(id, items);
@@ -65,6 +69,16 @@ class TransactionsRepository {
         await _insertItems(tx.id, items);
       }
     });
+  }
+
+  /// The payment method used most recently, to pre-select it next time.
+  Future<PaymentMethod?> lastPaymentMethod() async {
+    final last = await (_db.select(_db.transactions)
+          ..where((t) => t.paymentMethod.isNotNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+          ..limit(1))
+        .getSingleOrNull();
+    return last?.paymentMethod;
   }
 
   Future<List<TransactionItem>> itemsFor(String transactionId) {

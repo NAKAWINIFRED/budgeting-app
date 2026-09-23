@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../app/theme.dart';
 import '../../core/category_icons.dart';
 import '../../core/money.dart';
+import '../../core/money_kinds.dart';
 import '../dashboard/dashboard_providers.dart';
 
 /// One transaction in a list: icon, title, subtitle, signed amount.
@@ -19,7 +20,7 @@ class ActivityRow extends StatelessWidget {
   final ActivityItem item;
   final String currency;
 
-  /// Defaults to the date, e.g. "Sep 21".
+  /// Defaults to the date and payment method, e.g. "Sep 21, Cash".
   final String? subtitle;
   final VoidCallback? onTap;
 
@@ -55,7 +56,12 @@ class ActivityRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    subtitle ?? DateFormat.MMMd().format(item.tx.occurredAt),
+                    subtitle ??
+                        [
+                          DateFormat.MMMd().format(item.tx.occurredAt),
+                          if (item.tx.paymentMethod != null)
+                            item.tx.paymentMethod!.label,
+                        ].join(', '),
                     style: text.bodySmall?.copyWith(color: AppColors.mist),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -67,7 +73,7 @@ class ActivityRow extends StatelessWidget {
               '$sign${Money.format(item.tx.amountMinor, currency)}',
               style: AppText.amount(
                 15,
-                color: item.isIncoming ? AppColors.tide : AppColors.deepWater,
+                color: amountColorFor(item.tx.kind),
               ),
             ),
           ],

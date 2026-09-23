@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/app_config.dart';
 import '../../core/money.dart';
@@ -292,9 +293,12 @@ ActivityItem _describe(
         iconKey: 'payments',
       );
     case TransactionKind.income:
+      final period = tx.payPeriod;
+      final name = category?.name ?? 'Income';
       return ActivityItem(
         tx: tx,
-        title: category?.name ?? 'Income',
+        // e.g. "Salary for May"
+        title: period == null ? name : '$name for ${payPeriodLabel(period, tx.occurredAt)}',
         iconKey: category?.iconKey ?? 'work',
       );
     case TransactionKind.expense:
@@ -305,3 +309,9 @@ ActivityItem _describe(
       );
   }
 }
+
+/// "May", or "May 2025" when the pay period is in a different year.
+String payPeriodLabel(DateTime period, DateTime received) =>
+    period.year == received.year
+        ? DateFormat.MMMM().format(period)
+        : DateFormat.yMMMM().format(period);

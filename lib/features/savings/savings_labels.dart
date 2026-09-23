@@ -33,15 +33,24 @@ const goalIconKeys = [
   'storefront',
 ];
 
-const _sky = Color(0xFF4F9FD8);
+// A goal's color travels through three clearly different stops as it
+// fills: soft blue (just started) -> Tidewise teal (halfway) -> green (done).
+const _savingsStops = [
+  Color(0xFF6F9FE0), // 0%   soft blue
+  AppColors.tide, //    50%  teal
+  Color(0xFF2E9D57), // 100% green
+];
 
-/// A goal's color deepens from sky blue to Tidewise teal as it fills up.
 Color savingsProgressColor(double? progress) {
   if (progress == null) return AppColors.tide;
+  final t = progress.clamp(0.0, 1.0).toDouble();
+  final (from, to, local) = t < 0.5
+      ? (_savingsStops[0], _savingsStops[1], t / 0.5)
+      : (_savingsStops[1], _savingsStops[2], (t - 0.5) / 0.5);
   return HSVColor.lerp(
-    HSVColor.fromColor(_sky),
-    HSVColor.fromColor(AppColors.tide),
-    progress.clamp(0.0, 1.0).toDouble(),
+    HSVColor.fromColor(from),
+    HSVColor.fromColor(to),
+    local,
   )!
       .toColor();
 }

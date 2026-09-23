@@ -31,6 +31,32 @@ const Map<String, IconData> _icons = {
   'favorite': Icons.favorite_rounded,
   'trending_up': Icons.trending_up_rounded,
   'payments': Icons.payments_rounded,
+  'water_drop': Icons.water_drop_rounded,
+  'wifi': Icons.wifi_rounded,
+  'local_fire_department': Icons.local_fire_department_rounded,
+  'fitness_center': Icons.fitness_center_rounded,
+  'pets': Icons.pets_rounded,
+  'child_care': Icons.child_care_rounded,
+  'church': Icons.church_rounded,
+  'local_cafe': Icons.local_cafe_rounded,
+  'checkroom': Icons.checkroom_rounded,
+  'build': Icons.build_rounded,
+  'agriculture': Icons.agriculture_rounded,
+  'sell': Icons.sell_rounded,
+  'account_balance': Icons.account_balance_rounded,
+  'volunteer_activism': Icons.volunteer_activism_rounded,
 };
+
+/// Icons offered when a user creates or edits a category.
+const categoryIconKeys = [
+  'home', 'shopping_cart', 'cleaning_services', 'directions_bus',
+  'directions_car', 'bolt', 'water_drop', 'wifi', 'local_fire_department',
+  'phone_android', 'medical_services', 'school', 'family_restroom',
+  'child_care', 'restaurant', 'local_cafe', 'movie', 'shopping_bag',
+  'checkroom', 'spa', 'fitness_center', 'pets', 'card_giftcard',
+  'volunteer_activism', 'church', 'flight', 'build', 'work', 'storefront',
+  'handyman', 'agriculture', 'sell', 'account_balance', 'trending_up',
+  'redeem', 'savings', 'more_horiz',
+];
 
 IconData iconFor(String? key) => _icons[key] ?? Icons.more_horiz_rounded;

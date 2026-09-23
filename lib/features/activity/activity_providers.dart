@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../data/database.dart';
 import '../../data/database_provider.dart';
@@ -111,27 +112,33 @@ final monthActivityProvider = StreamProvider<MonthActivity>((ref) {
 });
 
 // ============================================================================
-// BREAKDOWN: where the month's money went, down to each item
+// BREAKDOWN: where the month's money went (or came from), down to each item
 // ============================================================================
 
 class BreakdownLine {
-  BreakdownLine(this.name, this.amountMinor, this.count);
+  BreakdownLine(this.name, this.amountMinor, this.count, {this.detail});
 
   final String name;
   final int amountMinor;
 
   /// How many times it was bought or paid this month.
   final int count;
+
+  /// Extra line under the name, e.g. the date an income arrived.
+  final String? detail;
 }
 
 class BreakdownGroup {
   BreakdownGroup({
+    required this.kind,
     required this.title,
     required this.iconKey,
     required this.totalMinor,
     required this.lines,
   });
 
+  /// Decides the group's color (expense red, income blue, and so on).
+  final TransactionKind kind;
   final String title;
   final String iconKey;
   final int totalMinor;
@@ -139,10 +146,13 @@ class BreakdownGroup {
 }
 
 class MonthBreakdown {
-  MonthBreakdown(this.groups);
+  MonthBreakdown(this.groups, this.byMethod);
 
   /// Biggest first.
   final List<BreakdownGroup> groups;
+
+  /// Totals per payment method (null = not set), biggest first.
+  final List<(PaymentMethod?, int)> byMethod;
 
   int get totalMinor => groups.fold(0, (sum, g) => sum + g.totalMinor);
 }
@@ -152,14 +162,18 @@ final monthBreakdownProvider = StreamProvider<MonthBreakdown>((ref) {
   final month = ref.watch(selectedMonthProvider);
   return watchTables(
     db,
-    [
-      db.transactions,
-      db.transactionItems,
-      db.categories,
-      db.debts,
-      db.savingsGoals,
-    ],
-    () => _loadBreakdown(db, month),
+    [db.transactions, db.transactionItems, db.categories, db.debts, db.savingsGoals],
+    () => _loadBreakdown(db, month, income: false),
+  );
+});
+
+final monthIncomeBreakdownProvider = StreamProvider<MonthBreakdown>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  final month = ref.watch(selectedMonthProvider);
+  return watchTables(
+    db,
+    [db.transactions, db.categories],
+    () => _loadBreakdown(db, month, income: true),
   );
 });
 
@@ -181,7 +195,23 @@ class _LineTotals {
     ..sort((a, b) => b.amountMinor.compareTo(a.amountMinor));
 }
 
-Future<MonthBreakdown> _loadBreakdown(AppDatabase db, DateTime month) async {
+class _GroupBuilder {
+  _GroupBuilder(this.kind, this.title, this.iconKey);
+
+  final TransactionKind kind;
+  final String title;
+  final String iconKey;
+  int total = 0;
+  bool hasDetail = false;
+  final totals = _LineTotals();
+  final entries = <(DateTime, BreakdownLine)>[];
+}
+
+Future<MonthBreakdown> _loadBreakdown(
+  AppDatabase db,
+  DateTime month, {
+  required bool income,
+}) async {
   final end = DateTime(month.year, month.month + 1);
   final txs = await (db.select(db.transactions)
         ..where(
@@ -191,14 +221,14 @@ Future<MonthBreakdown> _loadBreakdown(AppDatabase db, DateTime month) async {
         ))
       .get();
 
-  final outflows = txs
-      .where(
-        (t) =>
-            t.kind == TransactionKind.expense ||
-            t.kind == TransactionKind.debtPayment ||
-            t.kind == TransactionKind.savingsDeposit,
-      )
-      .toList();
+  final wanted = income
+      ? {TransactionKind.income}
+      : {
+          TransactionKind.expense,
+          TransactionKind.debtPayment,
+          TransactionKind.savingsDeposit,
+        };
+  final selected = txs.where((t) => wanted.contains(t.kind)).toList();
 
   final categories = {
     for (final c in await db.select(db.categories).get()) c.id: c,
@@ -208,8 +238,8 @@ Future<MonthBreakdown> _loadBreakdown(AppDatabase db, DateTime month) async {
     for (final g in await db.select(db.savingsGoals).get()) g.id: g,
   };
 
-  final ids = [for (final t in outflows) t.id];
-  final items = ids.isEmpty
+  final ids = [for (final t in selected) t.id];
+  final items = income || ids.isEmpty
       ? <TransactionItem>[]
       : await (db.select(db.transactionItems)
             ..where((i) => i.transactionId.isIn(ids)))
@@ -219,65 +249,86 @@ Future<MonthBreakdown> _loadBreakdown(AppDatabase db, DateTime month) async {
     itemsByTx.putIfAbsent(i.transactionId, () => []).add(i);
   }
 
-  // key -> (title, iconKey, total, line totals, has any itemized entries)
-  final groups = <String, (String, String, int, _LineTotals, bool)>{};
-
-  void addTo(
+  final groups = <String, _GroupBuilder>{};
+  _GroupBuilder group(
+    TransactionKind kind,
     String key,
     String title,
     String iconKey,
-    int amount,
-    void Function(_LineTotals lines) fill, {
-    bool itemized = false,
-  }) {
-    final g = groups[key] ?? (title, iconKey, 0, _LineTotals(), false);
-    fill(g.$4);
-    groups[key] = (g.$1, g.$2, g.$3 + amount, g.$4, g.$5 || itemized);
-  }
+  ) =>
+      groups.putIfAbsent(key, () => _GroupBuilder(kind, title, iconKey));
 
-  for (final tx in outflows) {
+  final byMethod = <PaymentMethod?, int>{};
+
+  for (final tx in selected) {
+    byMethod[tx.paymentMethod] = (byMethod[tx.paymentMethod] ?? 0) + tx.amountMinor;
+
     switch (tx.kind) {
+      case TransactionKind.income:
       case TransactionKind.expense:
+        // Group by the top-level category; subcategories become lines.
         final category = categories[tx.categoryId];
-        final txItems = itemsByTx[tx.id] ?? const <TransactionItem>[];
-        addTo(
-          'cat:${tx.categoryId}',
-          category?.name ?? 'Other',
-          category?.iconKey ?? 'more_horiz',
-          tx.amountMinor,
-          itemized: txItems.isNotEmpty,
-          (lines) {
+        final parent =
+            category?.parentId == null ? category : categories[category!.parentId];
+        final sub = category?.parentId == null ? null : category;
+        final g = group(
+          tx.kind,
+          'cat:${parent?.id}',
+          parent?.name ?? (income ? 'Income' : 'Other'),
+          parent?.iconKey ?? 'more_horiz',
+        );
+        g.total += tx.amountMinor;
+
+        if (income) {
+          // Income: list each payment with its date (and pay period).
+          final period = tx.payPeriod;
+          final detail = [
+            DateFormat.MMMd().format(tx.occurredAt),
+            if (period != null) 'for ${payPeriodLabel(period, tx.occurredAt)}',
+          ].join(', ');
+          final note = tx.note;
+          g.entries.add((
+            tx.occurredAt,
+            BreakdownLine(
+              sub?.name ?? (note != null && note.isNotEmpty ? note : g.title),
+              tx.amountMinor,
+              1,
+              detail: detail,
+            ),
+          ));
+          g.hasDetail = true;
+        } else {
+          final txItems = itemsByTx[tx.id] ?? const <TransactionItem>[];
+          if (txItems.isNotEmpty) {
             var itemizedSum = 0;
             for (final i in txItems) {
-              lines.add(i.name, i.amountMinor);
+              g.totals.add(i.name, i.amountMinor);
               itemizedSum += i.amountMinor;
             }
             final rest = tx.amountMinor - itemizedSum;
-            if (rest > 0) lines.add('Not broken down', rest);
-          },
-        );
+            if (rest > 0) g.totals.add(sub?.name ?? 'Not broken down', rest);
+            g.hasDetail = true;
+          } else if (sub != null) {
+            g.totals.add(sub.name, tx.amountMinor);
+            g.hasDetail = true;
+          } else {
+            g.totals.add('Not broken down', tx.amountMinor);
+          }
+        }
       case TransactionKind.debtPayment:
-        addTo(
-          'debts',
-          'Debt payments',
-          'payments',
-          tx.amountMinor,
-          itemized: true,
-          (lines) => lines.add(debts[tx.debtId]?.name ?? 'Debt', tx.amountMinor),
-        );
+        final g = group(tx.kind, 'debts', 'Debt payments', 'payments');
+        g.total += tx.amountMinor;
+        g.totals.add(debts[tx.debtId]?.name ?? 'Debt', tx.amountMinor);
+        g.hasDetail = true;
       case TransactionKind.savingsDeposit:
-        addTo(
-          'savings',
-          'Savings',
-          'savings',
+        final g = group(tx.kind, 'savings', 'Savings', 'savings');
+        g.total += tx.amountMinor;
+        g.totals.add(
+          goals[tx.savingsGoalId]?.name ?? 'General savings',
           tx.amountMinor,
-          itemized: true,
-          (lines) => lines.add(
-            goals[tx.savingsGoalId]?.name ?? 'General savings',
-            tx.amountMinor,
-          ),
         );
-      default:
+        g.hasDetail = true;
+      case TransactionKind.savingsWithdrawal:
         break;
     }
   }
@@ -285,13 +336,22 @@ Future<MonthBreakdown> _loadBreakdown(AppDatabase db, DateTime month) async {
   final result = [
     for (final g in groups.values)
       BreakdownGroup(
-        title: g.$1,
-        iconKey: g.$2,
-        totalMinor: g.$3,
-        // Only show lines when something in the group was broken down.
-        lines: g.$5 ? g.$4.toLines() : const [],
+        kind: g.kind,
+        title: g.title,
+        iconKey: g.iconKey,
+        totalMinor: g.total,
+        // Only show lines when there is something more specific to show.
+        lines: !g.hasDetail
+            ? const []
+            : income
+                ? ([...g.entries]..sort((a, b) => b.$1.compareTo(a.$1)))
+                    .map((e) => e.$2)
+                    .toList()
+                : g.totals.toLines(),
       ),
   ]..sort((a, b) => b.totalMinor.compareTo(a.totalMinor));
 
-  return MonthBreakdown(result);
+  final methods = byMethod.entries.map((e) => (e.key, e.value)).toList()
+    ..sort((a, b) => b.$2.compareTo(a.$2));
+  return MonthBreakdown(result, methods);
 }

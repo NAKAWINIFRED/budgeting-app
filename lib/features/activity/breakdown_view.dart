@@ -1,60 +1,150 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
 import '../../core/app_config.dart';
 import '../../core/category_icons.dart';
 import '../../core/money.dart';
+import '../../core/money_kinds.dart';
 import 'activity_providers.dart';
 
-/// "Where your money went": a grand total, each category's total, and
-/// inside each category the individual items (Eggs, Soap, Electricity...).
-class BreakdownView extends ConsumerWidget {
+/// "Where your money went" (or came from): a grand total, each category's
+/// total, and inside each category its subcategories and items, or for
+/// income each payment with its date.
+class BreakdownView extends ConsumerStatefulWidget {
   const BreakdownView({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final breakdown = ref.watch(monthBreakdownProvider);
+  ConsumerState<BreakdownView> createState() => _BreakdownViewState();
+}
+
+class _BreakdownViewState extends ConsumerState<BreakdownView> {
+  bool _income = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final breakdown = ref.watch(
+      _income ? monthIncomeBreakdownProvider : monthBreakdownProvider,
+    );
     final text = Theme.of(context).textTheme;
     const currency = kDefaultCurrency;
 
-    return breakdown.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Could not load the breakdown.\n$e')),
-      data: (b) => ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 112),
-        children: [
-          Text(
-            'Where your money went',
-            style: text.bodyMedium?.copyWith(color: AppColors.mist),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 112),
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: false, label: Text('Spending')),
+              ButtonSegment(value: true, label: Text('Income')),
+            ],
+            selected: {_income},
+            showSelectedIcon: false,
+            onSelectionChanged: (s) => setState(() => _income = s.first),
           ),
-          Text(
-            Money.format(b.totalMinor, currency),
-            style: AppText.amount(34, weight: FontWeight.w800),
+        ),
+        const SizedBox(height: 16),
+        breakdown.when(
+          loading: () => const SizedBox(height: 120),
+          error: (e, _) => Text('Could not load the breakdown.\n$e'),
+          data: (b) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                _income ? 'Money that came in' : 'Where your money went',
+                style: text.bodyMedium?.copyWith(color: AppColors.mist),
+              ),
+              Text(
+                Money.format(b.totalMinor, currency),
+                style: AppText.amount(
+                  34,
+                  weight: FontWeight.w800,
+                  color: _income ? AppColors.lagoon : AppColors.expense,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _income
+                    ? 'All income received this month, by category.'
+                    : 'Spending, bills, debt payments and savings this month.',
+                style: text.bodySmall?.copyWith(color: AppColors.mist),
+              ),
+              if (b.byMethod.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Text(
+                  _income ? 'How it came in' : 'How you paid',
+                  style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                for (final (method, amount) in b.byMethod)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          method?.icon ?? Icons.help_outline_rounded,
+                          size: 20,
+                          color: AppColors.mist,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            method?.label ?? 'Not set',
+                            style: text.bodyMedium,
+                          ),
+                        ),
+                        Text(
+                          '${(b.totalMinor == 0 ? 0 : amount * 100 / b.totalMinor).round()}%',
+                          style: text.bodySmall?.copyWith(color: AppColors.mist),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          Money.format(amount, currency),
+                          style: AppText.amount(15, weight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              const SizedBox(height: 20),
+              if (b.groups.isEmpty)
+                Text(
+                  _income
+                      ? 'No income recorded this month yet.'
+                      : 'Nothing spent this month yet.',
+                  style: text.bodyMedium?.copyWith(color: AppColors.mist),
+                ),
+              for (final g in b.groups)
+                _GroupTile(
+                  group: g,
+                  grandTotal: b.totalMinor,
+                  currency: currency,
+                  barColor: amountColorFor(g.kind),
+                ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => context.push(
+                    '/categories?kind=${_income ? 'income' : 'expense'}',
+                  ),
+                  icon: const Icon(Icons.tune_rounded, size: 20),
+                  label: const Text('Manage categories'),
+                ),
+              ),
+              if (!_income && b.groups.isNotEmpty)
+                Text(
+                  'Tip: pick a subcategory, or tap "Break it down into items" '
+                  'when adding an expense, to see exactly what each total '
+                  'was made of.',
+                  style: text.bodySmall?.copyWith(color: AppColors.mist),
+                ),
+            ],
           ),
-          const SizedBox(height: 2),
-          Text(
-            'Spending, bills, debt payments and savings this month.',
-            style: text.bodySmall?.copyWith(color: AppColors.mist),
-          ),
-          const SizedBox(height: 20),
-          if (b.groups.isEmpty)
-            Text(
-              'Nothing spent this month yet.',
-              style: text.bodyMedium?.copyWith(color: AppColors.mist),
-            ),
-          for (final g in b.groups)
-            _GroupTile(group: g, grandTotal: b.totalMinor, currency: currency),
-          if (b.groups.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              'Tip: when adding an expense, tap "Break it down into items" to '
-              'see exactly what each total was made of.',
-              style: text.bodySmall?.copyWith(color: AppColors.mist),
-            ),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -64,11 +154,13 @@ class _GroupTile extends StatefulWidget {
     required this.group,
     required this.grandTotal,
     required this.currency,
+    this.barColor = AppColors.tide,
   });
 
   final BreakdownGroup group;
   final int grandTotal;
   final String currency;
+  final Color barColor;
 
   @override
   State<_GroupTile> createState() => _GroupTileState();
@@ -126,7 +218,7 @@ class _GroupTileState extends State<_GroupTile> {
                           minHeight: 6,
                           borderRadius: BorderRadius.circular(6),
                           backgroundColor: AppColors.line,
-                          color: AppColors.tide,
+                          color: widget.barColor,
                         ),
                       ],
                     ),
@@ -167,15 +259,26 @@ class _GroupTileState extends State<_GroupTile> {
                       child: Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              line.count > 1
-                                  ? '${line.name}  \u00d7${line.count}'
-                                  : line.name,
-                              style: text.bodyMedium?.copyWith(
-                                color: line.name == 'Not broken down'
-                                    ? AppColors.mist
-                                    : AppColors.deepWater,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  line.count > 1
+                                      ? '${line.name}  \u00d7${line.count}'
+                                      : line.name,
+                                  style: text.bodyMedium?.copyWith(
+                                    color: line.name == 'Not broken down'
+                                        ? AppColors.mist
+                                        : AppColors.deepWater,
+                                  ),
+                                ),
+                                if (line.detail != null)
+                                  Text(
+                                    line.detail!,
+                                    style: text.bodySmall
+                                        ?.copyWith(color: AppColors.mist),
+                                  ),
+                              ],
                             ),
                           ),
                           Text(

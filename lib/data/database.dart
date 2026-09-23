@@ -28,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   // Bump this every time a table changes, and add a step in onUpgrade.
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -58,6 +58,18 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 4) {
             await m.addColumn(savingsGoals, savingsGoals.startingAmountMinor);
+          }
+          if (from < 5) {
+            await m.addColumn(categories, categories.parentId);
+            await m.addColumn(transactions, transactions.payPeriod);
+            final bills = await (select(categories)
+                  ..where((c) => c.name.equals('Bills & Utilities'))
+                  ..limit(1))
+                .getSingleOrNull();
+            if (bills != null) await _seedBillSubcategories(bills.id);
+          }
+          if (from < 6) {
+            await m.addColumn(transactions, transactions.paymentMethod);
           }
         },
         beforeOpen: (details) async {
@@ -197,6 +209,33 @@ class AppDatabase extends _$AppDatabase {
         ]);
       }
     });
+
+    final bills = await (select(categories)
+          ..where((c) => c.name.equals('Bills & Utilities'))
+          ..limit(1))
+        .getSingleOrNull();
+    if (bills != null) await _seedBillSubcategories(bills.id);
+  }
+
+  Future<void> _seedBillSubcategories(String parentId) async {
+    const subs = [
+      ('Electricity', 'bolt'),
+      ('Water', 'water_drop'),
+      ('Internet & Wifi', 'wifi'),
+      ('Cooking gas', 'local_fire_department'),
+    ];
+    for (var i = 0; i < subs.length; i++) {
+      await into(categories).insert(
+        CategoriesCompanion.insert(
+          name: subs[i].$1,
+          kind: CategoryKind.expense,
+          iconKey: subs[i].$2,
+          budgetTag: const Value(BudgetTag.essentials),
+          parentId: Value(parentId),
+          sortOrder: Value(i),
+        ),
+      );
+    }
   }
 }
 

@@ -34,6 +34,9 @@ enum DebtType {
 
 enum SavingsTerm { shortTerm, longTerm }
 
+/// How money was paid or received.
+enum PaymentMethod { cash, mobileMoney, bank, card, other }
+
 /// What a category, savings goal or debt "counts as" when a budget
 /// strategy splits income into buckets (e.g. 50% essentials).
 enum BudgetTag { essentials, wants, longTermSavings, shortTermSavings, debt }
@@ -61,8 +64,12 @@ class Categories extends Table with SyncColumns {
   TextColumn get name => text().withLength(min: 1, max: 40)();
   TextColumn get kind => textEnum<CategoryKind>()();
   TextColumn get iconKey => text()();
-  // Only expense categories have a budget tag.
+  // Only expense categories have a budget tag. Subcategories copy their
+  // parent's tag.
   TextColumn get budgetTag => textEnum<BudgetTag>().nullable()();
+  // Set for subcategories, e.g. Electricity -> Bills & Utilities.
+  // Null for top-level categories. (Schema version 5.)
+  TextColumn get parentId => text().nullable()();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
   BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
 
@@ -93,6 +100,11 @@ class Transactions extends Table with SyncColumns {
   TextColumn get currency => text().withLength(min: 3, max: 3)();
   DateTimeColumn get occurredAt => dateTime()();
   TextColumn get note => text().nullable()();
+  // Income only: the month this pay is for, e.g. May salary paid on
+  // June 1st. Stored as the first day of that month. (Schema version 5.)
+  DateTimeColumn get payPeriod => dateTime().nullable()();
+  // Cash, mobile money, bank or card. (Schema version 6.)
+  TextColumn get paymentMethod => textEnum<PaymentMethod>().nullable()();
 
   TextColumn get categoryId =>
       text().nullable().references(Categories, #id)();

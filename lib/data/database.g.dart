@@ -2080,6 +2080,17 @@ class $SavingsGoalsTable extends SavingsGoals
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _startingAmountMinorMeta =
+      const VerificationMeta('startingAmountMinor');
+  @override
+  late final GeneratedColumn<int> startingAmountMinor = GeneratedColumn<int>(
+    'starting_amount_minor',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _currencyMeta = const VerificationMeta(
     'currency',
   );
@@ -2140,6 +2151,7 @@ class $SavingsGoalsTable extends SavingsGoals
     name,
     term,
     targetAmountMinor,
+    startingAmountMinor,
     currency,
     targetDate,
     iconKey,
@@ -2186,6 +2198,15 @@ class $SavingsGoalsTable extends SavingsGoals
         targetAmountMinor.isAcceptableOrUnknown(
           data['target_amount_minor']!,
           _targetAmountMinorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('starting_amount_minor')) {
+      context.handle(
+        _startingAmountMinorMeta,
+        startingAmountMinor.isAcceptableOrUnknown(
+          data['starting_amount_minor']!,
+          _startingAmountMinorMeta,
         ),
       );
     }
@@ -2250,6 +2271,10 @@ class $SavingsGoalsTable extends SavingsGoals
         DriftSqlType.int,
         data['${effectivePrefix}target_amount_minor'],
       ),
+      startingAmountMinor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}starting_amount_minor'],
+      )!,
       currency: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}currency'],
@@ -2285,6 +2310,7 @@ class SavingsGoal extends DataClass implements Insertable<SavingsGoal> {
   final String name;
   final SavingsTerm term;
   final int? targetAmountMinor;
+  final int startingAmountMinor;
   final String currency;
   final DateTime? targetDate;
   final String? iconKey;
@@ -2296,6 +2322,7 @@ class SavingsGoal extends DataClass implements Insertable<SavingsGoal> {
     required this.name,
     required this.term,
     this.targetAmountMinor,
+    required this.startingAmountMinor,
     required this.currency,
     this.targetDate,
     this.iconKey,
@@ -2316,6 +2343,7 @@ class SavingsGoal extends DataClass implements Insertable<SavingsGoal> {
     if (!nullToAbsent || targetAmountMinor != null) {
       map['target_amount_minor'] = Variable<int>(targetAmountMinor);
     }
+    map['starting_amount_minor'] = Variable<int>(startingAmountMinor);
     map['currency'] = Variable<String>(currency);
     if (!nullToAbsent || targetDate != null) {
       map['target_date'] = Variable<DateTime>(targetDate);
@@ -2337,6 +2365,7 @@ class SavingsGoal extends DataClass implements Insertable<SavingsGoal> {
       targetAmountMinor: targetAmountMinor == null && nullToAbsent
           ? const Value.absent()
           : Value(targetAmountMinor),
+      startingAmountMinor: Value(startingAmountMinor),
       currency: Value(currency),
       targetDate: targetDate == null && nullToAbsent
           ? const Value.absent()
@@ -2362,6 +2391,9 @@ class SavingsGoal extends DataClass implements Insertable<SavingsGoal> {
         serializer.fromJson<String>(json['term']),
       ),
       targetAmountMinor: serializer.fromJson<int?>(json['targetAmountMinor']),
+      startingAmountMinor: serializer.fromJson<int>(
+        json['startingAmountMinor'],
+      ),
       currency: serializer.fromJson<String>(json['currency']),
       targetDate: serializer.fromJson<DateTime?>(json['targetDate']),
       iconKey: serializer.fromJson<String?>(json['iconKey']),
@@ -2380,6 +2412,7 @@ class SavingsGoal extends DataClass implements Insertable<SavingsGoal> {
         $SavingsGoalsTable.$converterterm.toJson(term),
       ),
       'targetAmountMinor': serializer.toJson<int?>(targetAmountMinor),
+      'startingAmountMinor': serializer.toJson<int>(startingAmountMinor),
       'currency': serializer.toJson<String>(currency),
       'targetDate': serializer.toJson<DateTime?>(targetDate),
       'iconKey': serializer.toJson<String?>(iconKey),
@@ -2394,6 +2427,7 @@ class SavingsGoal extends DataClass implements Insertable<SavingsGoal> {
     String? name,
     SavingsTerm? term,
     Value<int?> targetAmountMinor = const Value.absent(),
+    int? startingAmountMinor,
     String? currency,
     Value<DateTime?> targetDate = const Value.absent(),
     Value<String?> iconKey = const Value.absent(),
@@ -2407,6 +2441,7 @@ class SavingsGoal extends DataClass implements Insertable<SavingsGoal> {
     targetAmountMinor: targetAmountMinor.present
         ? targetAmountMinor.value
         : this.targetAmountMinor,
+    startingAmountMinor: startingAmountMinor ?? this.startingAmountMinor,
     currency: currency ?? this.currency,
     targetDate: targetDate.present ? targetDate.value : this.targetDate,
     iconKey: iconKey.present ? iconKey.value : this.iconKey,
@@ -2422,6 +2457,9 @@ class SavingsGoal extends DataClass implements Insertable<SavingsGoal> {
       targetAmountMinor: data.targetAmountMinor.present
           ? data.targetAmountMinor.value
           : this.targetAmountMinor,
+      startingAmountMinor: data.startingAmountMinor.present
+          ? data.startingAmountMinor.value
+          : this.startingAmountMinor,
       currency: data.currency.present ? data.currency.value : this.currency,
       targetDate: data.targetDate.present
           ? data.targetDate.value
@@ -2442,6 +2480,7 @@ class SavingsGoal extends DataClass implements Insertable<SavingsGoal> {
           ..write('name: $name, ')
           ..write('term: $term, ')
           ..write('targetAmountMinor: $targetAmountMinor, ')
+          ..write('startingAmountMinor: $startingAmountMinor, ')
           ..write('currency: $currency, ')
           ..write('targetDate: $targetDate, ')
           ..write('iconKey: $iconKey, ')
@@ -2458,6 +2497,7 @@ class SavingsGoal extends DataClass implements Insertable<SavingsGoal> {
     name,
     term,
     targetAmountMinor,
+    startingAmountMinor,
     currency,
     targetDate,
     iconKey,
@@ -2473,6 +2513,7 @@ class SavingsGoal extends DataClass implements Insertable<SavingsGoal> {
           other.name == this.name &&
           other.term == this.term &&
           other.targetAmountMinor == this.targetAmountMinor &&
+          other.startingAmountMinor == this.startingAmountMinor &&
           other.currency == this.currency &&
           other.targetDate == this.targetDate &&
           other.iconKey == this.iconKey &&
@@ -2486,6 +2527,7 @@ class SavingsGoalsCompanion extends UpdateCompanion<SavingsGoal> {
   final Value<String> name;
   final Value<SavingsTerm> term;
   final Value<int?> targetAmountMinor;
+  final Value<int> startingAmountMinor;
   final Value<String> currency;
   final Value<DateTime?> targetDate;
   final Value<String?> iconKey;
@@ -2498,6 +2540,7 @@ class SavingsGoalsCompanion extends UpdateCompanion<SavingsGoal> {
     this.name = const Value.absent(),
     this.term = const Value.absent(),
     this.targetAmountMinor = const Value.absent(),
+    this.startingAmountMinor = const Value.absent(),
     this.currency = const Value.absent(),
     this.targetDate = const Value.absent(),
     this.iconKey = const Value.absent(),
@@ -2511,6 +2554,7 @@ class SavingsGoalsCompanion extends UpdateCompanion<SavingsGoal> {
     required String name,
     required SavingsTerm term,
     this.targetAmountMinor = const Value.absent(),
+    this.startingAmountMinor = const Value.absent(),
     required String currency,
     this.targetDate = const Value.absent(),
     this.iconKey = const Value.absent(),
@@ -2526,6 +2570,7 @@ class SavingsGoalsCompanion extends UpdateCompanion<SavingsGoal> {
     Expression<String>? name,
     Expression<String>? term,
     Expression<int>? targetAmountMinor,
+    Expression<int>? startingAmountMinor,
     Expression<String>? currency,
     Expression<DateTime>? targetDate,
     Expression<String>? iconKey,
@@ -2539,6 +2584,8 @@ class SavingsGoalsCompanion extends UpdateCompanion<SavingsGoal> {
       if (name != null) 'name': name,
       if (term != null) 'term': term,
       if (targetAmountMinor != null) 'target_amount_minor': targetAmountMinor,
+      if (startingAmountMinor != null)
+        'starting_amount_minor': startingAmountMinor,
       if (currency != null) 'currency': currency,
       if (targetDate != null) 'target_date': targetDate,
       if (iconKey != null) 'icon_key': iconKey,
@@ -2554,6 +2601,7 @@ class SavingsGoalsCompanion extends UpdateCompanion<SavingsGoal> {
     Value<String>? name,
     Value<SavingsTerm>? term,
     Value<int?>? targetAmountMinor,
+    Value<int>? startingAmountMinor,
     Value<String>? currency,
     Value<DateTime?>? targetDate,
     Value<String?>? iconKey,
@@ -2567,6 +2615,7 @@ class SavingsGoalsCompanion extends UpdateCompanion<SavingsGoal> {
       name: name ?? this.name,
       term: term ?? this.term,
       targetAmountMinor: targetAmountMinor ?? this.targetAmountMinor,
+      startingAmountMinor: startingAmountMinor ?? this.startingAmountMinor,
       currency: currency ?? this.currency,
       targetDate: targetDate ?? this.targetDate,
       iconKey: iconKey ?? this.iconKey,
@@ -2598,6 +2647,9 @@ class SavingsGoalsCompanion extends UpdateCompanion<SavingsGoal> {
     if (targetAmountMinor.present) {
       map['target_amount_minor'] = Variable<int>(targetAmountMinor.value);
     }
+    if (startingAmountMinor.present) {
+      map['starting_amount_minor'] = Variable<int>(startingAmountMinor.value);
+    }
     if (currency.present) {
       map['currency'] = Variable<String>(currency.value);
     }
@@ -2625,6 +2677,7 @@ class SavingsGoalsCompanion extends UpdateCompanion<SavingsGoal> {
           ..write('name: $name, ')
           ..write('term: $term, ')
           ..write('targetAmountMinor: $targetAmountMinor, ')
+          ..write('startingAmountMinor: $startingAmountMinor, ')
           ..write('currency: $currency, ')
           ..write('targetDate: $targetDate, ')
           ..write('iconKey: $iconKey, ')
@@ -6125,6 +6178,7 @@ typedef $$SavingsGoalsTableCreateCompanionBuilder =
       required String name,
       required SavingsTerm term,
       Value<int?> targetAmountMinor,
+      Value<int> startingAmountMinor,
       required String currency,
       Value<DateTime?> targetDate,
       Value<String?> iconKey,
@@ -6139,6 +6193,7 @@ typedef $$SavingsGoalsTableUpdateCompanionBuilder =
       Value<String> name,
       Value<SavingsTerm> term,
       Value<int?> targetAmountMinor,
+      Value<int> startingAmountMinor,
       Value<String> currency,
       Value<DateTime?> targetDate,
       Value<String?> iconKey,
@@ -6206,6 +6261,11 @@ class $$SavingsGoalsTableFilterComposer
 
   ColumnFilters<int> get targetAmountMinor => $composableBuilder(
     column: $table.targetAmountMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get startingAmountMinor => $composableBuilder(
+    column: $table.startingAmountMinor,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6294,6 +6354,11 @@ class $$SavingsGoalsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get startingAmountMinor => $composableBuilder(
+    column: $table.startingAmountMinor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get currency => $composableBuilder(
     column: $table.currency,
     builder: (column) => ColumnOrderings(column),
@@ -6341,6 +6406,11 @@ class $$SavingsGoalsTableAnnotationComposer
 
   GeneratedColumn<int> get targetAmountMinor => $composableBuilder(
     column: $table.targetAmountMinor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get startingAmountMinor => $composableBuilder(
+    column: $table.startingAmountMinor,
     builder: (column) => column,
   );
 
@@ -6420,6 +6490,7 @@ class $$SavingsGoalsTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<SavingsTerm> term = const Value.absent(),
                 Value<int?> targetAmountMinor = const Value.absent(),
+                Value<int> startingAmountMinor = const Value.absent(),
                 Value<String> currency = const Value.absent(),
                 Value<DateTime?> targetDate = const Value.absent(),
                 Value<String?> iconKey = const Value.absent(),
@@ -6432,6 +6503,7 @@ class $$SavingsGoalsTableTableManager
                 name: name,
                 term: term,
                 targetAmountMinor: targetAmountMinor,
+                startingAmountMinor: startingAmountMinor,
                 currency: currency,
                 targetDate: targetDate,
                 iconKey: iconKey,
@@ -6446,6 +6518,7 @@ class $$SavingsGoalsTableTableManager
                 required String name,
                 required SavingsTerm term,
                 Value<int?> targetAmountMinor = const Value.absent(),
+                Value<int> startingAmountMinor = const Value.absent(),
                 required String currency,
                 Value<DateTime?> targetDate = const Value.absent(),
                 Value<String?> iconKey = const Value.absent(),
@@ -6458,6 +6531,7 @@ class $$SavingsGoalsTableTableManager
                 name: name,
                 term: term,
                 targetAmountMinor: targetAmountMinor,
+                startingAmountMinor: startingAmountMinor,
                 currency: currency,
                 targetDate: targetDate,
                 iconKey: iconKey,

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../app/theme.dart';
@@ -8,9 +9,11 @@ import '../../core/amount_input.dart';
 import '../../core/app_config.dart';
 import '../../core/category_icons.dart';
 import '../../core/money.dart';
+import '../../core/money_kinds.dart';
 import '../../data/database.dart';
 import '../../data/lookups.dart';
 import '../../data/transactions_repository.dart';
+import '../categories/categories_repository.dart';
 import '../debts/add_debt_sheet.dart';
 import '../debts/debt_labels.dart';
 import '../debts/debt_providers.dart';
@@ -94,6 +97,8 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   String? _categoryId;
   String? _goalId; // null = general savings
   String? _debtId;
+  DateTime? _payPeriod; // income only: the month this pay is for
+  PaymentMethod? _method; // cash, mobile money, bank, card
   DateTime _date = DateUtils.dateOnly(DateTime.now());
   bool _saving = false;
 
@@ -115,11 +120,19 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   void initState() {
     super.initState();
     final tx = widget.existing;
-    if (tx == null) return;
+    if (tx == null) {
+      // Pre-select the payment method used last time.
+      ref.read(transactionsRepositoryProvider).lastPaymentMethod().then((m) {
+        if (mounted && _method == null && m != null) setState(() => _method = m);
+      });
+      return;
+    }
+    _method = tx.paymentMethod;
     _kind = tx.kind;
     _categoryId = tx.categoryId;
     _goalId = tx.savingsGoalId;
     _debtId = tx.debtId;
+    _payPeriod = tx.payPeriod;
     _date = DateUtils.dateOnly(tx.occurredAt);
     _note.text = tx.note ?? '';
     _amount.text = _amountText(tx.amountMinor);
@@ -194,6 +207,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
         _items.clear();
       }
       _categoryId = null;
+      _payPeriod = null;
       _goalId = null;
       _debtId = null;
     });
@@ -236,6 +250,8 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
             savingsGoalId: Value(_goalId),
             debtId: Value(_debtId),
             note: Value(note.isEmpty ? null : note),
+            payPeriod: Value(kind == TransactionKind.income ? _payPeriod : null),
+            paymentMethod: Value(_method),
           ),
           items: _itemDrafts(),
         );
@@ -284,6 +300,8 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
         savingsGoalId: _goalId,
         debtId: _debtId,
         note: note.isEmpty ? null : note,
+        payPeriod: kind == TransactionKind.income ? _payPeriod : null,
+        paymentMethod: _method,
         items: _itemDrafts(),
       );
 
@@ -379,6 +397,38 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     }
   }
 
+  Future<void> _pickPayPeriod() async {
+    final base = DateTime(_date.year, _date.month);
+    final months = [for (var i = 1; i >= -6; i--) DateTime(base.year, base.month + i)];
+    final noMonth = DateTime(0);
+
+    final choice = await showDialog<DateTime>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Which month is this pay for?'),
+        children: [
+          for (final m in months)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(context).pop(m),
+              child: Text(
+                DateFormat.yMMMM().format(m),
+                style: TextStyle(
+                  fontWeight: m == _payPeriod ? FontWeight.w800 : FontWeight.w500,
+                  color: m == _payPeriod ? AppColors.tide : null,
+                ),
+              ),
+            ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(context).pop(noMonth),
+            child: const Text('No specific month'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null) return;
+    setState(() => _payPeriod = choice == noMonth ? null : choice);
+  }
+
   Future<void> _addGoal() async {
     final id = await showGoalSheet(context);
     if (id != null && mounted) setState(() => _goalId = id);
@@ -467,7 +517,11 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                     ),
                     Text(
                       Money.format(_amountMinor, _currency),
-                      style: AppText.amount(40, weight: FontWeight.w800),
+                      style: AppText.amount(
+                        40,
+                        weight: FontWeight.w800,
+                        color: amountColorFor(_kind),
+                      ),
                     ),
                   ],
                 ),
@@ -479,7 +533,11 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
               keyboardType: TextInputType.numberWithOptions(decimal: digits > 0),
               textInputAction: TextInputAction.done,
               inputFormatters: [amountInputFormatter(_currency)],
-              style: AppText.amount(40, weight: FontWeight.w800),
+              style: AppText.amount(
+                40,
+                weight: FontWeight.w800,
+                color: amountColorFor(_kind),
+              ),
               decoration: InputDecoration(
                 border: InputBorder.none,
                 hintText: '0',
@@ -518,6 +576,25 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
               ),
             ],
             const SizedBox(height: 20),
+            Text(
+              _kind == TransactionKind.income ||
+                      _kind == TransactionKind.savingsWithdrawal
+                  ? 'Received via'
+                  : 'Paid with',
+              style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            _chipWrap([
+              for (final m in PaymentMethod.values)
+                _choice(
+                  label: m.label,
+                  icon: m.icon,
+                  selected: _method == m,
+                  // Tap again to clear it.
+                  onTap: () => setState(() => _method = _method == m ? null : m),
+                ),
+            ]),
+            const SizedBox(height: 16),
             Row(
               children: [
                 ActionChip(
@@ -584,18 +661,83 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
       final kind = _kind == TransactionKind.income
           ? CategoryKind.income
           : CategoryKind.expense;
-      return ref.watch(categoriesProvider(kind)).when(
+      return ref.watch(categoryTreeProvider(kind)).when(
             loading: () => const SizedBox(height: 40),
             error: (e, _) => Text('Could not load categories. ($e)'),
-            data: (list) => _chipWrap([
-              for (final c in list)
-                _choice(
-                  label: c.name,
-                  icon: iconFor(c.iconKey),
-                  selected: _categoryId == c.id,
-                  onTap: () => setState(() => _categoryId = c.id),
-                ),
-            ]),
+            data: (nodes) {
+              // The parent that is chosen, directly or via a subcategory.
+              final selected = nodes
+                  .where(
+                    (n) =>
+                        n.category.id == _categoryId ||
+                        n.children.any((c) => c.id == _categoryId),
+                  )
+                  .firstOrNull;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _chipWrap([
+                    for (final n in nodes)
+                      _choice(
+                        label: n.category.name,
+                        icon: iconFor(n.category.iconKey),
+                        selected: selected == n,
+                        onTap: () => setState(() => _categoryId = n.category.id),
+                      ),
+                    ActionChip(
+                      avatar: const Icon(
+                        Icons.tune_rounded,
+                        size: 18,
+                        color: AppColors.tide,
+                      ),
+                      label: const Text('Edit'),
+                      backgroundColor: Colors.white,
+                      shape: const StadiumBorder(),
+                      side: const BorderSide(color: AppColors.tide),
+                      onPressed: () => context.push('/categories?kind=${kind.name}'),
+                    ),
+                  ]),
+                  if (selected != null && selected.children.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Which ${selected.category.name.toLowerCase()}? (optional)',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: AppColors.mist),
+                    ),
+                    const SizedBox(height: 8),
+                    _chipWrap([
+                      for (final sub in selected.children)
+                        _choice(
+                          label: sub.name,
+                          icon: iconFor(sub.iconKey),
+                          selected: _categoryId == sub.id,
+                          // Tapping the chosen one again goes back to the parent.
+                          onTap: () => setState(
+                            () => _categoryId = _categoryId == sub.id
+                                ? selected.category.id
+                                : sub.id,
+                          ),
+                        ),
+                    ]),
+                  ],
+                  if (_kind == TransactionKind.income) ...[
+                    const SizedBox(height: 12),
+                    ActionChip(
+                      avatar: const Icon(Icons.event_note_rounded, size: 18),
+                      label: Text(
+                        _payPeriod == null
+                            ? 'Which month is this pay for? (optional)'
+                            : 'Pay for ${DateFormat.yMMMM().format(_payPeriod!)}',
+                      ),
+                      onPressed: _pickPayPeriod,
+                    ),
+                  ],
+                ],
+              );
+            },
           );
     }
 

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../app/theme.dart';
 import '../../core/app_config.dart';
 import '../../core/money.dart';
+import '../../core/money_kinds.dart';
 import '../dashboard/dashboard_providers.dart';
 import '../shared/activity_row.dart';
 import '../transactions/quick_add_sheet.dart';
@@ -220,9 +221,13 @@ class _ActivityList extends StatelessWidget {
   /// The note, else the item names, else the time (the day is in the header).
   String _subtitle(ActivityItem item) {
     final note = item.tx.note;
-    if (note != null && note.isNotEmpty) return note;
-    if (item.itemNames.isNotEmpty) return item.itemNames.join(', ');
-    return DateFormat.jm().format(item.tx.occurredAt);
+    final main = note != null && note.isNotEmpty
+        ? note
+        : item.itemNames.isNotEmpty
+            ? item.itemNames.join(', ')
+            : DateFormat.jm().format(item.tx.occurredAt);
+    final method = item.tx.paymentMethod;
+    return method == null ? main : '$main, ${method.label}';
   }
 }
 
@@ -239,10 +244,18 @@ class _MonthTotals extends StatelessWidget {
         _Stat(
           label: 'In',
           value: Money.format(activity.inMinor, currency),
+          color: AppColors.lagoon,
+        ),
+        _Stat(
+          label: 'Out',
+          value: Money.format(activity.outMinor, currency),
+          color: AppColors.expense,
+        ),
+        _Stat(
+          label: 'Saved',
+          value: Money.format(activity.savedMinor, currency),
           color: AppColors.tide,
         ),
-        _Stat(label: 'Out', value: Money.format(activity.outMinor, currency)),
-        _Stat(label: 'Saved', value: Money.format(activity.savedMinor, currency)),
       ],
     );
   }

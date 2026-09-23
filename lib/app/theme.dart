@@ -12,6 +12,8 @@ class AppColors {
   static const amber = Color(0xFFE8A33D); // gentle warnings
   static const buoyRed = Color(0xFFD6453D); // overspending only
   static const mist = Color(0xFF5B7280); // secondary text
+  static const lagoon = Color(0xFF2A6FD1); // income: money coming in
+  static const expense = Color(0xFFD64545); // expenses: money going out
   static const line = Color(0xFFE1E9EA); // dividers, empty progress bars
 }
 
