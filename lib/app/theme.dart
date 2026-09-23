@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
+/// Manrope, bundled in assets/fonts (declared in pubspec.yaml), so the app
+/// looks right from the very first launch, even offline.
+const kFontFamily = 'Manrope';
 
 /// The Tidewise palette. Use these everywhere instead of raw hex values.
 class AppColors {
@@ -30,7 +33,8 @@ class AppText {
     Color color = AppColors.deepWater,
     FontWeight weight = FontWeight.w700,
   }) {
-    return GoogleFonts.manrope(
+    return TextStyle(
+      fontFamily: kFontFamily,
       fontSize: size,
       fontWeight: weight,
       color: color,
@@ -52,8 +56,13 @@ ThemeData buildAppTheme() {
     error: AppColors.buoyRed,
   );
 
-  final base = ThemeData(useMaterial3: true, colorScheme: colorScheme);
-  final textTheme = GoogleFonts.manropeTextTheme(base.textTheme).apply(
+  final base = ThemeData(
+    useMaterial3: true,
+    colorScheme: colorScheme,
+    fontFamily: kFontFamily,
+  );
+  final textTheme = base.textTheme.apply(
+    fontFamily: kFontFamily,
     bodyColor: AppColors.deepWater,
     displayColor: AppColors.deepWater,
   );
