@@ -212,7 +212,8 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
 
   void _removeItemRow(_ItemRow row) {
     setState(() => _items.remove(row));
-    row.dispose();
+    // Its text fields are still on screen until the next frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) => row.dispose());
   }
 
   bool get _canSave {
@@ -236,10 +237,13 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     setState(() {
       _kind = kind;
       if (kind != TransactionKind.expense) {
-        for (final row in _items) {
-          row.dispose();
-        }
+        final removed = [..._items];
         _items.clear();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          for (final row in removed) {
+            row.dispose();
+          }
+        });
       }
       _categoryId = null;
       _payPeriod = null;

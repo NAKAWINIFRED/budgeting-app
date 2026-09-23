@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show TextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
@@ -34,30 +35,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // --------------------------------------------------------------------------
 
   Future<void> _editName() async {
-    final controller = TextEditingController(text: AppConfig.userName ?? '');
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Your name'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(hintText: 'Your first name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
+      builder: (_) => _TextPromptDialog(
+        title: 'Your name',
+        initial: AppConfig.userName ?? '',
+        hint: 'Your first name',
+        capitalization: TextCapitalization.words,
       ),
     );
-    controller.dispose();
     if (result == null) return;
     AppConfig.userName = result.isEmpty ? null : result;
     await _store.set(SettingKeys.userName, result);
@@ -123,40 +109,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _editTypicalIncome() async {
     final currency = kDefaultCurrency;
     final current = AppConfig.typicalIncomeMinor;
-    final controller = TextEditingController(
-      text: current == null
-          ? ''
-          : Money.fromMinor(current, currency).round().toString(),
-    );
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Typical monthly income'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: TextInputType.numberWithOptions(
-            decimal: Money.fractionDigits(currency) > 0,
-          ),
-          inputFormatters: [amountInputFormatter(currency)],
-          decoration: InputDecoration(
-            prefixText: '${Money.symbol(currency)} ',
-            helperText: 'A rough number is fine.',
-          ),
+      builder: (_) => _TextPromptDialog(
+        title: 'Typical monthly income',
+        initial: current == null
+            ? ''
+            : Money.fromMinor(current, currency).round().toString(),
+        keyboardType: TextInputType.numberWithOptions(
+          decimal: Money.fractionDigits(currency) > 0,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: const Text('Save'),
-          ),
-        ],
+        formatters: [amountInputFormatter(currency)],
+        prefix: '${Money.symbol(currency)} ',
+        helper: 'A rough number is fine.',
       ),
     );
-    controller.dispose();
     if (result == null) return;
     final minor = parseAmountMinor(result, currency);
     AppConfig.typicalIncomeMinor = minor > 0 ? minor : null;
@@ -187,49 +154,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _erase() async {
-    final confirm = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          icon: const Icon(Icons.warning_amber_rounded, color: AppColors.buoyRed, size: 36),
-          title: const Text('Erase everything?'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'This permanently deletes all your income, expenses, savings, '
-                'investments, debts, subscriptions and settings. It cannot be '
-                'undone. Consider exporting your data first.',
-              ),
-              const SizedBox(height: 12),
-              const Text('Type ERASE to confirm.'),
-              TextField(
-                controller: confirm,
-                autofocus: true,
-                textCapitalization: TextCapitalization.characters,
-                onChanged: (_) => setDialogState(() {}),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.buoyRed),
-              onPressed: confirm.text.trim() == 'ERASE'
-                  ? () => Navigator.of(context).pop(true)
-                  : null,
-              child: const Text('Erase'),
-            ),
-          ],
-        ),
-      ),
+      builder: (_) => const _EraseDialog(),
     );
-    confirm.dispose();
     if (confirmed != true) return;
 
     await ref.read(appDatabaseProvider).eraseEverything();
@@ -465,6 +393,138 @@ class _CurrencyPickerState extends State<_CurrencyPicker> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ============================================================================
+// DIALOGS
+// Each dialog owns its text controller and disposes it only once the dialog
+// has fully closed. (Disposing it right after showDialog returns crashes,
+// because the closing animation is still using it.)
+// ============================================================================
+
+class _TextPromptDialog extends StatefulWidget {
+  const _TextPromptDialog({
+    required this.title,
+    required this.initial,
+    this.hint,
+    this.helper,
+    this.prefix,
+    this.keyboardType,
+    this.formatters,
+    this.capitalization = TextCapitalization.none,
+  });
+
+  final String title;
+  final String initial;
+  final String? hint;
+  final String? helper;
+  final String? prefix;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? formatters;
+  final TextCapitalization capitalization;
+
+  @override
+  State<_TextPromptDialog> createState() => _TextPromptDialogState();
+}
+
+class _TextPromptDialogState extends State<_TextPromptDialog> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        textCapitalization: widget.capitalization,
+        keyboardType: widget.keyboardType,
+        inputFormatters: widget.formatters,
+        decoration: InputDecoration(
+          hintText: widget.hint,
+          helperText: widget.helper,
+          prefixText: widget.prefix,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+class _EraseDialog extends StatefulWidget {
+  const _EraseDialog();
+
+  @override
+  State<_EraseDialog> createState() => _EraseDialogState();
+}
+
+class _EraseDialogState extends State<_EraseDialog> {
+  final _confirm = TextEditingController();
+
+  @override
+  void dispose() {
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      icon: const Icon(
+        Icons.warning_amber_rounded,
+        color: AppColors.buoyRed,
+        size: 36,
+      ),
+      title: const Text('Erase everything?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'This permanently deletes all your income, expenses, savings, '
+            'investments, debts, subscriptions and settings. It cannot be '
+            'undone. Consider exporting your data first.',
+          ),
+          const SizedBox(height: 12),
+          const Text('Type ERASE to confirm.'),
+          TextField(
+            controller: _confirm,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.buoyRed),
+          onPressed: _confirm.text.trim() == 'ERASE'
+              ? () => Navigator.of(context).pop(true)
+              : null,
+          child: const Text('Erase'),
+        ),
+      ],
     );
   }
 }
