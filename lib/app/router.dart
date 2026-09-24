@@ -12,6 +12,7 @@ import '../features/goals/goals_screen.dart';
 import '../features/income/income_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/plan/plan_screen.dart';
+import '../features/planned/planned_screen.dart';
 import '../features/settings/settings_screen.dart';
 
 /// Every page in the app. The side menu (app_drawer.dart) links to these.
@@ -32,6 +33,12 @@ final appRouter = GoRouter(
     _page('/', (_) => const DashboardScreen()),
     _page('/income', (_) => const IncomeScreen()),
     _page('/expenses', (_) => const ExpensesOverviewScreen()),
+    _page(
+      '/expenses/planned',
+      (state) => PlannedScreen(
+        startNextMonth: state.uri.queryParameters['month'] == 'next',
+      ),
+    ),
     _page(
       '/expenses/daily',
       (_) => const ExpenseSectionScreen(section: ExpenseSection.daily),

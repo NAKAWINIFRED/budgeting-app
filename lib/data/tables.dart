@@ -263,6 +263,26 @@ class Subscriptions extends Table with SyncColumns {
   Set<Column> get primaryKey => {id};
 }
 
+/// A shopping-list style plan of expenses for a month: "Water 50, Wifi 20,
+/// Rice". Prices are optional. Ticking an item off records a real expense.
+/// (Schema version 9.)
+@DataClassName('PlannedExpense')
+class PlannedExpenses extends Table with SyncColumns {
+  TextColumn get name => text().withLength(min: 1, max: 80)();
+  // Estimated price; replaced by the real price once it is bought.
+  IntColumn get amountMinor => integer().nullable()();
+  TextColumn get categoryId => text().nullable()();
+  // First day of the month this is planned for.
+  DateTimeColumn get forMonth => dateTime()();
+  BoolColumn get isDone => boolean().withDefault(const Constant(false))();
+  // The expense recorded when it was ticked off.
+  TextColumn get transactionId => text().nullable()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Small app settings and flags, e.g. "review for 2026-09 dismissed".
 /// (Schema version 7.)
 @DataClassName('KeyValue')

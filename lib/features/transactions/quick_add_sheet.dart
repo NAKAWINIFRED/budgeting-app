@@ -131,6 +131,9 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   DateTime _date = DateUtils.dateOnly(DateTime.now());
   bool _saving = false;
 
+  /// Whether the expense category picker is open.
+  bool _showCategories = false;
+
   /// Item rows when an expense is broken down (empty = not itemized).
   final List<_ItemRow> _items = [];
   List<TransactionItem> _originalItems = [];
@@ -219,7 +222,8 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   bool get _canSave {
     if (_saving || _amountMinor <= 0) return false;
     return switch (_kind) {
-      TransactionKind.expense || TransactionKind.income => _categoryId != null,
+      // A category is optional for expenses (they go to Other expenses).
+      TransactionKind.income => _categoryId != null,
       TransactionKind.debtPayment => _debtId != null,
       _ => true,
     };
@@ -587,14 +591,8 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
-            Text(
-              _kind.pickerTitle,
-              style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 10),
-            _buildPicker(),
             if (_kind == TransactionKind.expense) ...[
-              const SizedBox(height: 16),
+              // 1. Write freely: the items come first.
               if (_itemized) ...[
                 Text(
                   'Items',
@@ -605,14 +603,32 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
               ],
               Align(
                 alignment: Alignment.centerLeft,
-                child: TextButton.icon(
+                child: OutlinedButton.icon(
                   onPressed: _addItemRow,
-                  icon: const Icon(Icons.add_rounded, size: 20),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.tide,
+                    side: const BorderSide(color: AppColors.tide),
+                    shape: const StadiumBorder(),
+                  ),
+                  icon: Icon(
+                    _itemized ? Icons.add_rounded : Icons.list_alt_rounded,
+                    size: 20,
+                  ),
                   label: Text(
-                    _itemized ? 'Add another item' : 'Break it down into items',
+                    _itemized ? 'Add another item' : 'Write a list of items',
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+              // 2. Then, if they like, where it belongs.
+              _buildExpenseCategory(),
+            ] else ...[
+              Text(
+                _kind.pickerTitle,
+                style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 10),
+              _buildPicker(),
             ],
             const SizedBox(height: 20),
             Text(
@@ -688,6 +704,166 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
         ),
       ),
     );
+  }
+
+  /// Optional category for an expense: one tidy row that opens into
+  /// categories grouped by the side-menu page they appear on.
+  Widget _buildExpenseCategory() {
+    final text = Theme.of(context).textTheme;
+    return ref.watch(categoryTreeProvider(CategoryKind.expense)).when(
+          loading: () => const SizedBox(height: 48),
+          error: (e, _) => Text('Could not load categories. ($e)'),
+          data: (nodes) {
+            final all = [
+              for (final n in nodes) ...[n.category, ...n.children],
+            ];
+            final chosen = all.where((c) => c.id == _categoryId).firstOrNull;
+            final parent = chosen == null
+                ? null
+                : chosen.parentId == null
+                    ? chosen
+                    : all.where((c) => c.id == chosen.parentId).firstOrNull;
+            String pageOf(ExpenseGroup? g) => switch (g) {
+                  ExpenseGroup.daily => 'Daily expenses',
+                  ExpenseGroup.billsHousing => 'Bills & housing',
+                  _ => 'Other expenses',
+                };
+            final selectedNode = nodes
+                .where(
+                  (n) =>
+                      n.category.id == _categoryId ||
+                      n.children.any((c) => c.id == _categoryId),
+                )
+                .firstOrNull;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => setState(() => _showCategories = !_showCategories),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.foam,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          chosen == null
+                              ? Icons.label_outline_rounded
+                              : iconFor(chosen.iconKey),
+                          color: AppColors.deepWater,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                chosen == null
+                                    ? 'Category (optional)'
+                                    : chosen.name,
+                                style: text.bodyLarge
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              Text(
+                                chosen == null
+                                    ? 'Without one, it shows under Other expenses'
+                                    : 'Shows under ${pageOf(parent?.expenseGroup)}',
+                                style: text.bodySmall
+                                    ?.copyWith(color: AppColors.mist),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (chosen != null)
+                          IconButton(
+                            tooltip: 'Remove category',
+                            icon: const Icon(Icons.close_rounded, size: 20),
+                            onPressed: () => setState(() => _categoryId = null),
+                          ),
+                        Icon(
+                          _showCategories
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
+                          color: AppColors.mist,
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_showCategories) ...[
+                  for (final group in ExpenseGroup.values) ...[
+                    if (nodes.any(
+                      (n) => (n.category.expenseGroup ?? ExpenseGroup.other) == group,
+                    )) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(top: 14, bottom: 8),
+                        child: Text(
+                          pageOf(group),
+                          style: text.labelMedium?.copyWith(
+                            color: AppColors.mist,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      _chipWrap([
+                        for (final n in nodes.where(
+                          (n) =>
+                              (n.category.expenseGroup ?? ExpenseGroup.other) ==
+                              group,
+                        ))
+                          _choice(
+                            label: n.category.name,
+                            icon: iconFor(n.category.iconKey),
+                            selected: selectedNode == n,
+                            onTap: () =>
+                                setState(() => _categoryId = n.category.id),
+                          ),
+                      ]),
+                    ],
+                  ],
+                  if (selectedNode != null && selectedNode.children.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 14, bottom: 8),
+                      child: Text(
+                        'Which ${selectedNode.category.name.toLowerCase()}? (optional)',
+                        style: text.labelMedium?.copyWith(
+                          color: AppColors.mist,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    _chipWrap([
+                      for (final sub in selectedNode.children)
+                        _choice(
+                          label: sub.name,
+                          icon: iconFor(sub.iconKey),
+                          selected: _categoryId == sub.id,
+                          onTap: () => setState(
+                            () => _categoryId = _categoryId == sub.id
+                                ? selectedNode.category.id
+                                : sub.id,
+                          ),
+                        ),
+                    ]),
+                  ],
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => context.push('/categories?kind=expense'),
+                      icon: const Icon(Icons.tune_rounded, size: 18),
+                      label: const Text('Edit categories'),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
+        );
   }
 
   Widget _buildPicker() {

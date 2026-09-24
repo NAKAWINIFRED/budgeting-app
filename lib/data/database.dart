@@ -23,6 +23,7 @@ part 'database.g.dart';
     InvestmentValuations,
     Subscriptions,
     KeyValues,
+    PlannedExpenses,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -31,7 +32,7 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   // Bump this every time a table changes, and add a step in onUpgrade.
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -86,6 +87,9 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(categories, categories.expenseGroup);
             await _assignExpenseGroups();
           }
+          if (from < 9) {
+            await m.createTable(plannedExpenses);
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
@@ -98,6 +102,7 @@ class AppDatabase extends _$AppDatabase {
   /// exactly like a fresh install. Used by Settings, "Erase everything".
   Future<void> eraseEverything() => transaction(() async {
         final tables = <TableInfo>[
+          plannedExpenses,
           transactionItems,
           investmentValuations,
           transactions,

@@ -12,7 +12,29 @@ import '../shared/day_grouped_list.dart';
 import '../subscriptions/subscription_sheet.dart';
 import '../subscriptions/subscriptions_providers.dart';
 import '../subscriptions/subscriptions_screen.dart';
+import '../../data/database.dart';
+import '../../data/lookups.dart';
+import '../activity/activity_providers.dart' show selectedMonthProvider;
+import '../planned/planned_providers.dart';
+import '../planned/planned_screen.dart';
 import 'expenses_providers.dart';
+
+/// Upcoming (not yet bought) expenses for the chosen month, per page.
+final _upcomingBySectionProvider =
+    Provider<Map<ExpenseSection, List<PlannedExpense>>>((ref) {
+  final month = ref.watch(selectedMonthProvider);
+  final items = ref.watch(plannedExpensesProvider(month)).value ?? const [];
+  final cats = {
+    for (final c in ref.watch(categoriesProvider(CategoryKind.expense)).value ??
+        const <CategoryItem>[])
+      c.id: c,
+  };
+  final result = {for (final s in ExpenseSection.values) s: <PlannedExpense>[]};
+  for (final item in items.where((i) => !i.isDone)) {
+    result[sectionOfCategory(item.categoryId, cats)]!.add(item);
+  }
+  return result;
+});
 
 String get _currency => kDefaultCurrency;
 
@@ -67,6 +89,7 @@ class ExpensesOverviewScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final data = ref.watch(expensesMonthProvider);
+    final upcoming = ref.watch(_upcomingBySectionProvider);
     final text = Theme.of(context).textTheme;
 
     return MainScaffold(
@@ -86,6 +109,9 @@ class ExpensesOverviewScreen extends ConsumerWidget {
                   for (final section in ExpenseSection.values)
                     _SectionCard(
                       section: section,
+                      upcomingMinor: upcoming[section]!
+                          .fold(0, (s, i) => s + (i.amountMinor ?? 0)),
+                      upcomingCount: upcoming[section]!.length,
                       totalMinor: m.sections[section]!.totalMinor,
                       share: m.totalMinor == 0
                           ? 0
@@ -112,9 +138,13 @@ class _SectionCard extends StatelessWidget {
     required this.section,
     required this.totalMinor,
     required this.share,
+    this.upcomingMinor = 0,
+    this.upcomingCount = 0,
   });
 
   final ExpenseSection section;
+  final int upcomingMinor;
+  final int upcomingCount;
   final int totalMinor;
   final double share;
 
@@ -176,6 +206,16 @@ class _SectionCard extends StatelessWidget {
                     '${(share * 100).round()}%',
                     style: text.bodySmall?.copyWith(color: AppColors.mist),
                   ),
+                  if (upcomingCount > 0)
+                    Text(
+                      upcomingMinor > 0
+                          ? '+${Money.format(upcomingMinor, _currency)} upcoming'
+                          : '+$upcomingCount upcoming',
+                      style: text.bodySmall?.copyWith(
+                        color: AppColors.amber,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                 ],
               ),
               const Icon(Icons.chevron_right_rounded, color: AppColors.mist),
@@ -200,6 +240,13 @@ class ExpenseSectionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final data = ref.watch(expensesMonthProvider);
     final isSubs = section == ExpenseSection.subscriptions;
+    final upcoming = ref.watch(_upcomingBySectionProvider)[section]!;
+    final month = ref.watch(selectedMonthProvider);
+    final cats = {
+      for (final c in ref.watch(categoriesProvider(CategoryKind.expense)).value ??
+          const <CategoryItem>[])
+        c.id: c,
+    };
 
     return MainScaffold(
       title: section.label,
@@ -235,6 +282,33 @@ class ExpenseSectionScreen extends ConsumerWidget {
                           ?.copyWith(color: AppColors.mist),
                     ),
                     if (isSubs) const _SubscriptionsList(),
+                    if (!isSubs && upcoming.isNotEmpty) ...[
+                      const _Title('Coming up'),
+                      Text(
+                        '${upcoming.length} upcoming '
+                        '${upcoming.length == 1 ? 'expense' : 'expenses'}'
+                        '${upcoming.any((i) => i.amountMinor != null) ? ', about ${Money.format(upcoming.fold(0, (s, i) => s + (i.amountMinor ?? 0)), _currency)}' : ''}. '
+                        'Tick one off when you buy it.',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: AppColors.mist),
+                      ),
+                      for (final item in upcoming)
+                        PlannedItemTile(
+                          item: item,
+                          category: cats[item.categoryId],
+                          onToggle: () =>
+                              togglePlannedItem(context, ref, item, month),
+                        ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: () => context.push('/expenses/planned'),
+                          child: const Text('All upcoming expenses'),
+                        ),
+                      ),
+                    ],
                     if (s.categories.isNotEmpty) ...[
                       const _Title('By category'),
                       for (final c in s.categories)

@@ -14,6 +14,7 @@ import '../../dev/sample_data.dart';
 import '../debts/debt_providers.dart';
 import '../investments/investment_sheets.dart' show gainColor;
 import '../investments/investments_providers.dart';
+import '../planned/planned_providers.dart';
 import '../review/month_review.dart';
 import '../savings/savings_providers.dart';
 import '../shared/activity_row.dart';
@@ -49,6 +50,7 @@ class DashboardScreen extends ConsumerWidget {
             _SafeToSpendCard(summary: s),
             const MonthReviewCard(),
             const _UpcomingSection(),
+            _PlannedCard(summary: s),
             const SizedBox(height: 28),
             _OverviewTiles(summary: s),
             const SizedBox(height: 28),
@@ -569,6 +571,101 @@ class _Tile extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// What is still on this month's upcoming expenses, and what is safe to spend
+/// after it. Near the end of the month, a nudge to plan the next one.
+class _PlannedCard extends ConsumerWidget {
+  const _PlannedCard({required this.summary});
+
+  final DashboardSummary summary;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final now = DateTime.now();
+    final month = DateTime(now.year, now.month);
+    final next = DateTime(now.year, now.month + 1);
+    final text = Theme.of(context).textTheme;
+    String fmt(int m) => Money.format(m, summary.currency);
+
+    final list = PlannedSummary(
+      ref.watch(plannedExpensesProvider(month)).value ?? const [],
+    );
+    final nextList = PlannedSummary(
+      ref.watch(plannedExpensesProvider(next)).value ?? const [],
+    );
+    final daysLeft = DateTime(now.year, now.month + 1, 0).day - now.day;
+
+    if (list.pending.isEmpty) {
+      if (daysLeft > 10 || !nextList.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => context.push('/expenses/planned?month=next'),
+            icon: const Icon(Icons.checklist_rounded, size: 20),
+            label: Text(
+              'Plan ${DateFormat.MMMM().format(next)}: add your upcoming expenses',
+            ),
+          ),
+        ),
+      );
+    }
+
+    final after = summary.safeToSpendMinor - list.remainingMinor;
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => context.push('/expenses/planned'),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: Row(
+            children: [
+              const CircleAvatar(
+                radius: 20,
+                backgroundColor: AppColors.shallows,
+                child: Icon(Icons.checklist_rounded, color: AppColors.deepWater, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Still to buy: ${fmt(list.remainingMinor)} '
+                      '(${list.pending.length} '
+                      '${list.pending.length == 1 ? 'item' : 'items'})',
+                      style: text.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      summary.incomeMinor <= 0
+                          ? 'From your upcoming expenses'
+                          : after >= 0
+                              ? 'After these, about ${fmt(after)} is safe to spend'
+                              : 'These add up to ${fmt(-after)} more than you have left',
+                      style: text.bodySmall?.copyWith(
+                        color: after < 0 && summary.incomeMinor > 0
+                            ? AppColors.expense
+                            : AppColors.mist,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.mist),
+            ],
+          ),
         ),
       ),
     );

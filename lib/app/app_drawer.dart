@@ -110,6 +110,7 @@ class AppDrawer extends StatelessWidget {
                 ),
                 childrenPadding: EdgeInsets.zero,
                 children: [
+                  item('Upcoming expenses', Icons.checklist_rounded, '/expenses/planned', indent: 12),
                   item('All expenses', Icons.pie_chart_outline_rounded, '/expenses', indent: 12),
                   item('Daily expenses', Icons.shopping_basket_outlined, '/expenses/daily', indent: 12),
                   item('Bills & housing', Icons.home_outlined, '/expenses/bills', indent: 12),

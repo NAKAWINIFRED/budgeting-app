@@ -75,7 +75,15 @@ class ExpensesMonth {
 /// Which page an expense belongs on.
 ExpenseSection sectionOf(MoneyTransaction tx, Map<String, CategoryItem> cats) {
   if (tx.subscriptionId != null) return ExpenseSection.subscriptions;
-  final c = cats[tx.categoryId];
+  return sectionOfCategory(tx.categoryId, cats);
+}
+
+/// Which page a category's expenses appear on (no category = Other).
+ExpenseSection sectionOfCategory(
+  String? categoryId,
+  Map<String, CategoryItem> cats,
+) {
+  final c = cats[categoryId];
   final parent = c?.parentId == null ? c : cats[c!.parentId];
   return switch (parent?.expenseGroup) {
     ExpenseGroup.daily => ExpenseSection.daily,
